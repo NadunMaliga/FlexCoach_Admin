@@ -1,6 +1,5 @@
 import { Stack, SplashScreen } from "expo-router";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
 import CustomSplashScreen from "./SplashScreen";
 
 // Prevent the splash screen from auto-hiding
@@ -15,10 +14,9 @@ export default function RootLayout() {
       try {
         // Hide expo's default splash screen immediately
         await SplashScreen.hideAsync();
-        
-        // Set ready state
+
         setIsReady(true);
-        
+
         // Hide custom splash after 2.5 seconds
         setTimeout(() => {
           setShowCustomSplash(false);
@@ -36,47 +34,26 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: "black" },  
+        headerTintColor: "white",                  
+        headerTitleStyle: { color: "white" },       
+      }}
+    >
       <Stack.Screen
         name="index"
         options={{ headerShown: false }}
       />
-      
       <Stack.Screen
-        name="signup"
-        options={{
-          headerTitle: "",
-          headerStyle: { backgroundColor: "black" },
-          headerTintColor: "white",
-        }}
+        name="Chat"
+        options={{ headerShown: false }}
       />
-      
-      <Stack.Screen
-        name="signin"
-        options={{
-          headerTitle: "",
-          headerStyle: { backgroundColor: "black" },
-          headerTintColor: "white",
-        }}
-      />
-
-       <Stack.Screen
-        name="verify"
-        options={{
-          headerTitle: "",
-          headerStyle: { backgroundColor: "black" },
-          headerTintColor: "white",
-        }}
-      />
-      
-      <Stack.Screen
-        name="bodyMeasurement"
-        options={{
-          headerTitle: "",
-          headerStyle: { backgroundColor: "black" },
-          headerTintColor: "white",
-        }}
-      />
+      <Stack.Screen name="signin" options={{ headerTitle: "" }} />
+      <Stack.Screen name="verify" options={{ headerTitle: "" }} />
+      <Stack.Screen name="ClientProfile" />
+      <Stack.Screen name="DietPlan" />
+      <Stack.Screen name="ExercisePlan" />
     </Stack>
   );
 }
