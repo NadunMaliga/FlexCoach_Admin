@@ -7,7 +7,7 @@ import Svg, { Path } from "react-native-svg";
 import Dashboard from "./Dashboard";
 import Clients from "./Clients";
 import Exercise from "./Exercise";
-import Schedule from "./Schedule";
+import Foods from "./Foods";   // 👈 Foods import karala
 
 // ------------------- SVG ICONS -------------------
 const homeSVG = (color, size) => (
@@ -34,13 +34,9 @@ const clientsSVG = (color, size) => (
   </Svg>
 );
 
-const scheduleSVG = (color, size) => (
+const foodsSVG = (color, size) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M7.4 7H4.6C4.26863 7 4 7.26863 4 7.6V16.4C4 16.7314 4.26863 17 4.6 17H7.4C7.73137 17 8 16.7314 8 16.4V7.6C8 7.26863 7.73137 7 7.4 7Z"/>
-    <Path d="M19.4 7H16.6C16.2686 7 16 7.26863 16 7.6V16.4C16 16.7314 16.2686 17 16.6 17H19.4C19.7314 17 20 16.7314 20 16.4V7.6C20 7.26863 19.7314 7 19.4 7Z"/>
-    <Path d="M1 14.4V9.6C1 9.26863 1.26863 9 1.6 9H3.4C3.73137 9 4 9.26863 4 9.6V14.4C4 14.7314 3.73137 15 3.4 15H1.6C1.26863 15 1 14.7314 1 14.4Z"/>
-    <Path d="M23 14.4V9.6C23 9.26863 22.7314 9 22.4 9H20.6C20.2686 9 20 9.26863 20 9.6V14.4C20 14.7314 20.2686 15 20.6 15H22.4C22.7314 15 23 14.7314 23 14.4Z"/>
-    <Path d="M8 12H16"/>
+    <Path d="M4 3H20M4 9H20M4 15H20M4 21H20" />  
   </Svg>
 );
 
@@ -65,8 +61,8 @@ export default function Home() {
         return <Clients />;
       case "Exercise":
         return <Exercise />;
-      case "Schedule":
-        return <Schedule />;
+      case "Foods":       // 👈 Foods tab
+        return <Foods />;
       default:
         return <Dashboard />;
     }
@@ -76,7 +72,7 @@ export default function Home() {
     { name: "Dashboard", label: "Home", svg: homeSVG },
     { name: "Clients", label: "Clients", svg: clientsSVG },
     { name: "Exercise", label: "Exercise", svg: exerciseSVG },
-    { name: "Schedule", label: "Schedule", svg: scheduleSVG },
+    { name: "Foods", label: "Foods", svg: foodsSVG }, // 👈 Foods tab
   ];
 
   return (

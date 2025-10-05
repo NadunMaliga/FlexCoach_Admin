@@ -174,6 +174,14 @@ export default function DietPlan() {
                     </View>
                 </View>
             </Modal>
+            {/* Floating Add Button */}
+            <TouchableOpacity
+                style={styles.floatingAddBtn}
+                onPress={() => router.push("/AddDiet")}
+            >
+                <Text style={styles.addBtnText}>+</Text>
+            </TouchableOpacity>
+
         </View>
     );
 }
@@ -243,6 +251,22 @@ const styles = StyleSheet.create({
         fontFamily: "Poppins_400Regular",
         textAlign: "center",
     },
+    floatingAddBtn: {
+        position: "absolute",
+        bottom: 150, // a little above the footer
+        right: 25,
+        backgroundColor: "#d5ff5f",
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: "center",
+        justifyContent: "center", 
+    },
+    addBtnText: {
+        fontSize: 35,
+        color: "black", // matching footer color
+     },
+
 
     modalOverlay: {
         flex: 1,

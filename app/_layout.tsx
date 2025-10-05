@@ -36,9 +36,9 @@ export default function RootLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "black" },  
-        headerTintColor: "white",                  
-        headerTitleStyle: { color: "white" },       
+        headerStyle: { backgroundColor: "black" },
+        headerTintColor: "white",
+        headerTitleStyle: { color: "white" },
       }}
     >
       <Stack.Screen
@@ -49,6 +49,15 @@ export default function RootLayout() {
         name="Chat"
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="AddSchedule"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddDiet"
+        options={{ headerShown: false }}
+      />
+
       <Stack.Screen name="signin" options={{ headerTitle: "" }} />
       <Stack.Screen name="verify" options={{ headerTitle: "" }} />
       <Stack.Screen name="ClientProfile" />

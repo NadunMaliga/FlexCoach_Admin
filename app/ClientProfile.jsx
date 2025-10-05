@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
 
+
 import {
   View,
   Text,
@@ -169,6 +170,18 @@ export default function ClientProfile() {
           </View>
         )}
       </ScrollView>
+
+
+      <TouchableOpacity
+        style={styles.imageViewButton}
+        onPress={() => router.push("/ClientBodyImage")} // navigate to ClientBodyImage page
+      >
+        <Svg width={25} height={25} viewBox="0 0 24 24" fill="none" stroke={"#101010ff"} strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M4 4H20V20H4V4Z" />
+          <Path d="M4 15L8 11L13 16L16 13L20 17" />
+          <Path d="M9 9H9.01" />
+        </Svg>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.chatButton}
@@ -343,17 +356,29 @@ const styles = StyleSheet.create({
 
   chatButton: {
     position: "absolute",
-    bottom: 150,     
-    right: 20,      
+    bottom: 150,
+    right: 20,
     backgroundColor: "#dcff7cff",
     width: 70,
     height: 70,
     borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 100,  
+    zIndex: 100,
   },
+  imageViewButton: {
 
+    position: "absolute",
+    bottom: 240,
+    right: 20,
+    backgroundColor: "#ffffffff",
+    width: 65,
+    height: 65,
+    borderRadius: 35,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+  },
 
   footer: {
     position: "absolute",

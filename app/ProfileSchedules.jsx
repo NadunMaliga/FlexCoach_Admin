@@ -112,7 +112,7 @@ export default function ProfileSchedules() {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
       >
-        <Text style={styles.dayTitle}>{day}</Text>
+        <Text style={styles.dayTitle}>Day 1</Text>
         <Text style={styles.text}>
           This Client workout will be updated here according to your schedule.
           Click on a workout to see full details.
