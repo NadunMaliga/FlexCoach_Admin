@@ -1,25 +1,27 @@
-import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
-import { useRouter } from "expo-router";
-import Icon from "react-native-vector-icons/Feather";
-import {
-  useFonts,
   Poppins_300Light,
   Poppins_400Regular,
   Poppins_600SemiBold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Icon from "react-native-vector-icons/Feather";
+import { useAuth } from "./contexts/AuthContext";
 
 export default function SignIn() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [fontsLoaded] = useFonts({
     Poppins_300Light,
@@ -51,9 +53,16 @@ export default function SignIn() {
     try {
       setSubmitting(true);
 
+      const success = await login(password);
 
-      router.replace("/home");
+      if (success) {
+        // Navigation will be handled automatically by AuthContext
+        console.log('Login successful, will auto-redirect to Dashboard');
+      } else {
+        setError("Invalid password");
+      }
     } catch (err) {
+      console.error("Login error:", err);
       setError("Invalid password");
     } finally {
       setSubmitting(false);
@@ -66,7 +75,7 @@ export default function SignIn() {
     <View style={styles.container}>
       <Text style={styles.header}>Verify You</Text>
       <Text style={styles.secondheader}>
-       Enter the password given to you{"\n"} by the admin.
+        Enter the password given to you{"\n"} by the admin.
       </Text>
 
       <KeyboardAvoidingView
@@ -105,28 +114,28 @@ export default function SignIn() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-       {/* Footer — Sign In */}
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.nextButton, ]}
-                onPress={onSignIn}
-                disabled={isDisabled}
-              >
-                <Text style={styles.nextButtonText}>
-                  {submitting ? "Next..." : "Next"}
-                </Text>
-              </TouchableOpacity>
-      
-              {/* Go to Sign Up (optional) */}
-              <TouchableOpacity
-                style={{ marginTop: 14, alignItems: "center" }}
-                onPress={() => router.push("/signin")}
-              >
-                <Text style={{ color: "#757575ff", fontFamily: "Poppins_400Regular" }}>
-                  Already have an account? <Text style={{ color: "#000000ff" }}>Sign in</Text>
-                </Text>
-              </TouchableOpacity>
-            </View>
+      {/* Footer — Sign In */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.nextButton,]}
+          onPress={onSignIn}
+          disabled={isDisabled}
+        >
+          <Text style={styles.nextButtonText}>
+            {submitting ? "Next..." : "Next"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Go to Sign Up (optional) */}
+        <TouchableOpacity
+          style={{ marginTop: 14, alignItems: "center" }}
+          onPress={() => router.push("/signin")}
+        >
+          <Text style={{ color: "#757575ff", fontFamily: "Poppins_400Regular" }}>
+            Already have an account? <Text style={{ color: "#000000ff" }}>Sign in</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -173,7 +182,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#d5ff5f",
     padding: 25,
-    paddingVertical:20,
+    paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: "#171717ff",
   },

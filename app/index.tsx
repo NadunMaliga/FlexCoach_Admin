@@ -1,16 +1,34 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from "react-native";
-import { useFonts, Poppins_300Light } from '@expo-google-fonts/poppins';
+import { Poppins_300Light, useFonts } from '@expo-google-fonts/poppins';
 import { useRouter } from "expo-router";
+import React, { useEffect } from "react";
+import { ActivityIndicator, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useAuth } from './contexts/AuthContext';
 
 export default function Index() {
   const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
 
   let [fontsLoaded] = useFonts({
     Poppins_300Light,
   });
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      // User is already authenticated, redirect to dashboard
+      router.replace('/(protected)/Dashboard');
+    }
+  }, [isAuthenticated, isLoading]);
+
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#d5ff5f" />
+      </View>
+    );
+  }
+
+  // Don't show the welcome screen if user is authenticated
+  if (isAuthenticated) {
     return null;
   }
 
@@ -30,7 +48,7 @@ export default function Index() {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/verify")}
+          onPress={() => router.push("/signin")}
         >
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>

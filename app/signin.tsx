@@ -1,23 +1,23 @@
 
+import {
+    Poppins_300Light,
+    Poppins_400Regular,
+    Poppins_600SemiBold,
+    useFonts,
+} from "@expo-google-fonts/poppins";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/Feather";
-import {
-  useFonts,
-  Poppins_300Light,
-  Poppins_400Regular,
-  Poppins_600SemiBold,
-} from "@expo-google-fonts/poppins";
 
 export default function SignIn() {
   const router = useRouter();
@@ -73,9 +73,16 @@ export default function SignIn() {
     try {
       setSubmitting(true);
 
-      router.replace("/home");
+      // Check for admin credentials
+      if (form.email.trim() === "admin@gmail.com" && form.password === "Password123") {
+        router.replace("/verify");
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          password: "Invalid email or password",
+        }));
+      }
     } catch (err) {
-
       setErrors((prev) => ({
         ...prev,
         password: "Invalid email or password",

@@ -1,68 +1,64 @@
-import { Stack, SplashScreen } from "expo-router";
-import { useEffect, useState } from "react";
-import CustomSplashScreen from "./SplashScreen";
-
-// Prevent the splash screen from auto-hiding
-SplashScreen.preventAutoHideAsync();
+import { Stack } from 'expo-router';
+import { AuthProvider } from './contexts/AuthContext';
 
 export default function RootLayout() {
-  const [isReady, setIsReady] = useState(false);
-  const [showCustomSplash, setShowCustomSplash] = useState(true);
-
-  useEffect(() => {
-    async function prepare() {
-      try {
-        // Hide expo's default splash screen immediately
-        await SplashScreen.hideAsync();
-
-        setIsReady(true);
-
-        // Hide custom splash after 2.5 seconds
-        setTimeout(() => {
-          setShowCustomSplash(false);
-        }, 2500);
-      } catch (e) {
-        console.warn(e);
-      }
-    }
-
-    prepare();
-  }, []);
-
-  if (!isReady || showCustomSplash) {
-    return <CustomSplashScreen />;
-  }
-
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: "black" },
-        headerTintColor: "white",
-        headerTitleStyle: { color: "white" },
-      }}
-    >
-      <Stack.Screen
-        name="index"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Chat"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AddSchedule"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AddDiet"
-        options={{ headerShown: false }}
-      />
+    <AuthProvider>
+      <Stack screenOptions={{ 
+        headerShown: true,
+        headerStyle: { backgroundColor: '#000' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+      }}>
+        <Stack.Screen 
+          name="index" 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="signin" 
+          options={{ 
+            title: 'Sign In',
+            headerShown: true 
+          }} 
+        />
+        <Stack.Screen 
+          name="verify" 
+          options={{ 
+            title: 'Verify Account',
+            headerShown: true 
+          }} 
+        />
+        <Stack.Screen 
+          name="Chat" 
+          options={{ 
+            title: 'Chat'
+          }} 
+        />
 
-      <Stack.Screen name="signin" options={{ headerTitle: "" }} />
-      <Stack.Screen name="verify" options={{ headerTitle: "" }} />
-      <Stack.Screen name="ClientProfile" />
-      <Stack.Screen name="DietPlan" />
-      <Stack.Screen name="ExercisePlan" />
-    </Stack>
+        <Stack.Screen 
+          name="ClientBodyImage" 
+          options={{ 
+            title: 'Body Images'
+          }} 
+        />
+        <Stack.Screen 
+          name="Alert" 
+          options={{ 
+            title: 'Alerts'
+          }} 
+        />
+        <Stack.Screen 
+          name="SplashScreen" 
+          options={{ 
+            headerShown: false
+          }} 
+        />
+
+        <Stack.Screen 
+          name="(protected)" 
+          options={{ headerShown: false }} 
+        />
+      </Stack>
+    </AuthProvider>
   );
 }

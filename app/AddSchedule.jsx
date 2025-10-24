@@ -96,7 +96,7 @@ export default function AddSchedule() {
         keyboardType="numeric"
       />
       <Text style={styles.text}>You can continue the exercise schedule you have applied to your client from here. It can be done in three steps:
-              </Text>
+      </Text>
     </>
   );
 
@@ -126,7 +126,7 @@ export default function AddSchedule() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-               <TouchableOpacity onPress={() => setExerciseModalVisible(false)}>
+              <TouchableOpacity onPress={() => setExerciseModalVisible(false)}>
                 <Feather name="x" size={22} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -165,7 +165,7 @@ export default function AddSchedule() {
         keyboardType="numeric"
         value={tempExercise.reps}
         onChangeText={(t) => setTempExercise({ ...tempExercise, reps: t })}
-      /> 
+      />
       <TextInput
         style={styles.input}
         placeholder="Rest (sec)"
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 23,
   },
-  
+
   text: {
     color: "#777",
     textAlign: "center",
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-   optionItem: {
+  optionItem: {
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#1e1d1dff",

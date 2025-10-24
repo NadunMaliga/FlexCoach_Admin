@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
@@ -205,11 +205,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#1c1c1c",
     paddingHorizontal: 15,
-    paddingVertical: 5,
+    paddingVertical: 15,
     borderRadius: 30,
     marginBottom: 15,
   },
-  searchInput: { flex: 1, color: "#fff", fontSize: 17 },
+  searchInput: { 
+    flex: 1, 
+    color: "#fff", 
+    fontSize: 17,
+    paddingVertical: 5,
+  },
   card: {
     flexDirection: "row",
     alignItems: "center",

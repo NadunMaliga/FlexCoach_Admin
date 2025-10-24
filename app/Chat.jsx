@@ -1,23 +1,23 @@
-import React, { useState, useRef } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  Image,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  StatusBar,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import * as Audio from "expo-av";
-import EmojiPicker from "rn-emoji-keyboard";
 import { useNavigation } from "@react-navigation/native";
+import * as Audio from "expo-av";
+import * as ImagePicker from "expo-image-picker";
+import { useRef, useState } from "react";
+import {
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import EmojiPicker from "rn-emoji-keyboard";
 
 export default function ChatScreen() {
   const navigation = useNavigation();
@@ -138,27 +138,18 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={90} // adjust header height
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity
-                style={{ marginRight: 15 }}
-                onPress={() => navigation.goBack()}
-              >
-                <Ionicons name="arrow-back" size={28} color="#fff" />
-              </TouchableOpacity>
-
-              <Image
-                source={{ uri: "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg" }}
-                style={styles.profilePic}
-              />
-              <View>
-                <Text style={styles.username}>Nadun Malinga</Text>
-                <Text style={styles.status}>Online</Text>
-              </View>
+          {/* User info section */}
+          <View style={styles.userInfo}>
+            <Image
+              source={{ uri: "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg" }}
+              style={styles.profilePic}
+            />
+            <View>
+              <Text style={styles.username}>Nadun Malinga</Text>
+              <Text style={styles.status}>Online</Text>
             </View>
           </View>
 
@@ -251,14 +242,13 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#111" },
-  header: {
+  userInfo: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 15,
     backgroundColor: "#212121",
   },
-  headerLeft: { flexDirection: "row", alignItems: "center" },
   profilePic: {
     width: 50,
     height: 50,
