@@ -1,8 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
+Dimensions,
     Image,
     SafeAreaView,
     ScrollView,
@@ -10,10 +9,15 @@ import {
     Text,
     View
 } from "react-native";
+import Logger from '../utils/logger';
 import { LineChart } from "react-native-chart-kit";
 import Svg, { Path } from "react-native-svg";
 import { useAuth } from "../contexts/AuthContext";
 import ApiService from "../services/api";
+import DashboardSkeleton from '../components/DashboardSkeleton';
+import LoadingGif from '../components/LoadingGif';
+
+
 
 // Define types for better TypeScript support
 interface User {
@@ -85,7 +89,7 @@ export default function Dashboard() {
 
       if (overviewResponse.success) {
         setClientOverview(overviewResponse.overview);
-        console.log('Client overview loaded:', overviewResponse.overview);
+        Logger.log('Client overview loaded:', overviewResponse.overview);
         
         // Extract stats from client overview data
         const overview = overviewResponse.overview;
@@ -104,12 +108,12 @@ export default function Dashboard() {
         };
         
         setDashboardData(extractedStats);
-        console.log('Extracted dashboard stats:', extractedStats);
+        Logger.log('Extracted dashboard stats:', extractedStats);
       }
 
       if (usersResponse.success) {
         // Fetch user profiles for profile photos
-        console.log(`📋 Loading profiles for ${usersResponse.users.length} recent users...`);
+        Logger.log(`📋 Loading profiles for ${usersResponse.users.length} recent users...`);
         
         const usersWithProfiles = await Promise.all(
           usersResponse.users.map(async (user: User) => {
@@ -119,7 +123,7 @@ export default function Dashboard() {
                 ? profileResponse.userProfile.profilePhoto 
                 : null;
               
-              console.log(`👤 ${user.firstName} ${user.lastName}: ${profilePhoto ? '✅ Has profile photo' : '❌ No profile photo'}`);
+              Logger.log(`👤 ${user.firstName} ${user.lastName}: ${profilePhoto ? '✅ Has profile photo' : '❌ No profile photo'}`);
               
               return {
                 id: user._id,
@@ -129,7 +133,7 @@ export default function Dashboard() {
                 avatar: profilePhoto || user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg"
               };
             } catch (err) {
-              console.log(`❌ Profile not found for user ${user.firstName} ${user.lastName} (${user._id}):`, err.message);
+              Logger.log(`❌ Profile not found for user ${user.firstName} ${user.lastName} (${user._id}):`, err.message);
               return {
                 id: user._id,
                 name: `${user.firstName} ${user.lastName}`,
@@ -144,7 +148,7 @@ export default function Dashboard() {
         setRecentUsers(usersWithProfiles);
       }
     } catch (err) {
-      console.error('Dashboard load error:', err);
+      Logger.error('Dashboard load error:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
@@ -154,7 +158,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
         <Text style={{ color: '#fff', marginTop: 10 }}>Loading dashboard...</Text>
       </SafeAreaView>
     );
@@ -279,8 +283,8 @@ export default function Dashboard() {
               <Image 
                 source={{ uri: user.avatar }} 
                 style={styles.avatar}
-                onLoad={() => console.log('✅ Dashboard avatar loaded for:', user.name)}
-                onError={(error) => console.log('❌ Dashboard avatar error for:', user.name, error.nativeEvent.error)}
+                onLoad={() => Logger.success('Dashboard avatar loaded for:', user.name)}
+                onError={(error) => Logger.log('❌ Dashboard avatar error for:', user.name, error.nativeEvent.error)}
               />
               <View style={{ flex: 1 }}>
                 <Text style={styles.userName}>{user.name}</Text>

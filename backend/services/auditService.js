@@ -26,6 +26,13 @@ class AuditService {
     errorMessage = null
   }) {
     try {
+      // Handle the case where adminId is the string "admin" (simple admin)
+      // Skip audit logging for simple admin to avoid ObjectId validation errors
+      if (adminId === 'admin') {
+        console.log(`Skipping audit log for simple admin: ${action} on ${resource}`);
+        return null;
+      }
+
       const auditLog = new AuditLog({
         adminId,
         action,

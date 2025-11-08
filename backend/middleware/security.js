@@ -20,7 +20,7 @@ const corsOptions = {
       'http://localhost:19006',    // Expo development server
       'http://localhost:8081',     // Metro bundler
       'exp://localhost:19000',     // Expo app
-      'exp://192.168.1.100:19000', // Expo app on local network
+      'exp://172.28.26.234:19000', // Expo app on local network
       config.CORS_ORIGIN,         // Production origin from config
       // Add more origins as needed for different environments
     ].filter(Boolean); // Remove any undefined values
@@ -215,7 +215,7 @@ const validateJWTToken = (req, res, next) => {
 
   // Verify JWT token
   try {
-    jwt.verify(token, config.JWT_SECRET || 'flexcoach_admin_super_secret_key_2024', (err, decoded) => {
+    jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
       if (err) {
         let errorCode = ErrorCodes.INVALID_TOKEN;
         let errorMessage = 'Invalid token';

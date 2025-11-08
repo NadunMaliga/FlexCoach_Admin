@@ -1,10 +1,10 @@
-
 import {
     Poppins_300Light,
     Poppins_400Regular,
     Poppins_600SemiBold,
     useFonts,
 } from "@expo-google-fonts/poppins";
+import Logger from './utils/logger';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -18,6 +18,7 @@ import {
     View,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
+import apiService from "./services/api";
 
 export default function SignIn() {
   const router = useRouter();
@@ -73,16 +74,21 @@ export default function SignIn() {
     try {
       setSubmitting(true);
 
-      // Check for admin credentials
-      if (form.email.trim() === "admin@gmail.com" && form.password === "Password123") {
+      // Call the backend API to authenticate
+      const response = await apiService.login(form.password, form.email);
+      
+      if (response.success) {
+        // Login successful, navigate to verify/dashboard
         router.replace("/verify");
       } else {
+        // Login failed
         setErrors((prev) => ({
           ...prev,
-          password: "Invalid email or password",
+          password: response.error || "Invalid email or password",
         }));
       }
     } catch (err) {
+      Logger.error('Login error:', err);
       setErrors((prev) => ({
         ...prev,
         password: "Invalid email or password",

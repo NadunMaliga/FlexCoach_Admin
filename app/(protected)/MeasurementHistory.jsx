@@ -1,10 +1,14 @@
 import { Poppins_400Regular, Poppins_500Medium, useFonts } from '@expo-google-fonts/poppins';
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import Svg, { Path } from "react-native-svg";
 import ApiService from '../services/api';
+import Logger from '../utils/logger';
+import LoadingGif from '../components/LoadingGif';
+
+
 
 export default function MeasurementHistory() {
     const { userId, measurement } = useLocalSearchParams();
@@ -42,7 +46,7 @@ export default function MeasurementHistory() {
                 setError('Failed to load measurements');
             }
         } catch (err) {
-            console.error('Load measurements error:', err);
+            Logger.error('Load measurements error:', err);
             setError('Failed to load measurements');
         } finally {
             setLoading(false);
@@ -95,7 +99,7 @@ export default function MeasurementHistory() {
     if (loading) {
         return (
             <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color="#d5ff5f" />
+                <LoadingGif size={100} />
                 <Text style={styles.loadingText}>Loading measurements...</Text>
             </View>
         );

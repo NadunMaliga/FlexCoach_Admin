@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
+Image,
     Modal,
     ScrollView,
     StyleSheet,
@@ -10,8 +9,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 // SVG Icons for Personal Information
 const PersonIcon = ({ size = 24, color = "#9e9e9e" }) => (
@@ -113,7 +115,7 @@ export default function ClientProfile() {
           const parsedUser = JSON.parse(userParam);
           setUser(parsedUser);
         } catch (e) {
-          console.error('Error parsing user param:', e);
+          Logger.error('Error parsing user param:', e);
         }
       }
 
@@ -124,7 +126,7 @@ export default function ClientProfile() {
           ApiService.getUserLatestMeasurements(userId),
           ApiService.getUserOnboarding(userId),
           ApiService.getUserProfile(userId).catch(err => {
-            console.log('User profile not found:', err.message);
+            Logger.log('User profile not found:', err.message);
             return { success: false };
           })
         ]);
@@ -143,11 +145,11 @@ export default function ClientProfile() {
 
         if (userProfileResponse.success) {
           setUserProfile(userProfileResponse.userProfile);
-          console.log('📸 User profile loaded:', userProfileResponse.userProfile.profilePhoto);
+          Logger.log('📸 User profile loaded:', userProfileResponse.userProfile.profilePhoto);
         }
       }
     } catch (err) {
-      console.error('Load user data error:', err);
+      Logger.error('Load user data error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -157,7 +159,7 @@ export default function ClientProfile() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
         <Text style={{ color: '#fff', marginTop: 10 }}>Loading profile...</Text>
       </View>
     );
@@ -205,8 +207,8 @@ export default function ClientProfile() {
             uri: userProfile?.profilePhoto || user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg"
           }}
           style={styles.profilePic}
-          onLoad={() => console.log('✅ Profile image loaded:', userProfile?.profilePhoto || user.profilePhoto)}
-          onError={(error) => console.log('❌ Profile image error:', error.nativeEvent.error)}
+          onLoad={() => Logger.success('Profile image loaded:', userProfile?.profilePhoto || user.profilePhoto)}
+          onError={(error) => Logger.log('❌ Profile image error:', error.nativeEvent.error)}
         />
 
         {/* Name */}
@@ -228,10 +230,10 @@ export default function ClientProfile() {
               style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
               onPress={() => {
                 if (tab === "Exercise") {
-                  console.log('Navigating to ExercisePlan with userId:', userId);
+                  Logger.log('Navigating to ExercisePlan with userId:', userId);
                   router.push(`/ExercisePlan?userId=${userId}`);
                 } else if (tab === "Diet Plan") {
-                  console.log('Navigating to DietPlan with userId:', userId);
+                  Logger.log('Navigating to DietPlan with userId:', userId);
                   router.push(`/DietPlan?userId=${userId}`);
                 } else {
                   setActiveTab(tab);

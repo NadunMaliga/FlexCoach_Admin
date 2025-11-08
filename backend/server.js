@@ -1,4 +1,8 @@
+// Load environment variables
+require('dotenv').config();
+
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const compression = require('compression');
 const bcrypt = require('bcryptjs');
@@ -48,6 +52,7 @@ const {
   validateCommonParams
 } = require('./middleware/validation');
 
+// Import secure error handling middleware
 const {
   errorHandler,
   notFoundHandler,
@@ -57,13 +62,13 @@ const {
   AuthenticationError,
   AuthorizationError,
   NotFoundError,
-  ConflictError,
   DatabaseError,
-  ErrorCodes,
-  StatusCodes,
-  handleDatabaseConnectionError,
+  ERROR_CODES,
+  ERROR_TYPES,
+  handleDatabaseError,
+  handleJWTError,
   setupGlobalErrorHandlers
-} = require('./middleware/errorHandler');
+} = require('../../shared-middleware/error-handling');
 
 // Import enhanced security and rate limiting middleware
 const {
@@ -89,6 +94,38 @@ const app = express();
 
 // Apply enhanced security middleware stack
 console.log('🔒 Applying enhanced security middleware...');
+
+// Apply additional security middleware
+app.use((req, res, next) => {
+  // Additional security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// Input sanitization middleware
+app.use((req, res, next) => {
+  // Sanitize request body, query, and params
+  const sanitizeObject = (obj) => {
+    if (obj && typeof obj === 'object') {
+      for (const key in obj) {
+        if (typeof obj[key] === 'string') {
+          // Remove dangerous characters
+          obj[key] = obj[key].replace(/[<>]/g, '');
+        } else if (typeof obj[key] === 'object') {
+          sanitizeObject(obj[key]);
+        }
+      }
+    }
+  };
+
+  if (req.body) sanitizeObject(req.body);
+  if (req.query) sanitizeObject(req.query);
+  if (req.params) sanitizeObject(req.params);
+  
+  next();
+});
 
 // Global rate limiting (very permissive, just for basic protection)
 app.use(globalRateLimit);
@@ -287,10 +324,7 @@ app.get('/test-login', (req, res) => {
   res.json({
     success: true,
     message: 'Login endpoint updated - expecting email and password',
-    expectedCredentials: {
-      email: 'admin@gmail.com',
-      password: 'Password123'
-    },
+    note: 'Credentials are now configured via environment variables',
     timestamp: new Date().toISOString()
   });
 });
@@ -358,35 +392,51 @@ app.get('/api/admin/rate-limit-status', applyRateLimit('admin'), authenticateTok
 
 // Admin Authentication Routes
 
-// Simple password-based admin login
-app.post('/api/admin/login', applyRateLimit('login'), asyncHandler(async (req, res) => {
+// Secure admin login with environment variables
+app.post('/api/admin/login', applyRateLimit('login'), validateAdminLogin, asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
 
     console.log('Login attempt:', { email, password: password ? '***' : 'missing' });
 
-    // Simple email and password check
-    if (email !== 'admin@gmail.com' || password !== 'Password123') {
-      console.log('Login failed - invalid credentials');
-      return res.status(401).json({
+    // Input validation
+    if (!email || !password) {
+      return res.status(400).json({
         success: false,
-        error: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS'
+        error: 'Email and password are required',
+        code: 'MISSING_CREDENTIALS'
       });
+    }
+
+    // Check against environment variables
+    if (email !== config.ADMIN_EMAIL) {
+      throw new AuthenticationError('Invalid credentials', ERROR_CODES.INVALID_CREDENTIALS);
+    }
+
+    // Verify password against hashed password from environment
+    console.log('Comparing password...');
+    console.log('Config ADMIN_EMAIL:', config.ADMIN_EMAIL);
+    console.log('Config ADMIN_PASSWORD_HASH:', config.ADMIN_PASSWORD_HASH ? config.ADMIN_PASSWORD_HASH.substring(0, 20) + '...' : 'undefined');
+    
+    const isValidPassword = await bcrypt.compare(password, config.ADMIN_PASSWORD_HASH);
+    console.log('Password comparison result:', isValidPassword);
+    
+    if (!isValidPassword) {
+      throw new AuthenticationError('Invalid credentials', ERROR_CODES.INVALID_CREDENTIALS);
     }
 
     console.log('Login successful');
 
-    // Generate JWT token for simple admin access
+    // Generate JWT token with secure admin access
     const token = jwt.sign(
       {
         userId: 'admin',
         userType: 'admin',
         role: 'admin',
         username: 'admin',
-        email: 'admin@gmail.com'
+        email: config.ADMIN_EMAIL
       },
-      JWT_SECRET,
+      config.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -400,16 +450,18 @@ app.post('/api/admin/login', applyRateLimit('login'), asyncHandler(async (req, r
         username: 'admin',
         role: 'admin',
         isActive: true,
-        lastLogin: new Date()
+        lastLogin: new Date(),
+        email: config.ADMIN_EMAIL
       }
     });
   } catch (error) {
-    console.error('Admin login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
+    console.error('Login error:', error);
+    // Re-throw authentication errors as-is
+    if (error instanceof AuthenticationError) {
+      throw error;
+    }
+    // Only convert unexpected errors to DatabaseError
+    throw new DatabaseError('Login failed due to server error');
   }
 }));
 
@@ -878,7 +930,7 @@ app.get('/api/admin/users/filters', authenticateToken, requireAdmin, validateAdm
 });
 
 // Get user by ID
-app.get('/api/admin/users/:userId', authenticateToken, requireAdmin, validateAdminEndpoint, auditProfileView, async (req, res) => {
+app.get('/api/admin/users/:userId', authenticateToken, requireAdmin, validateUserId, validateAdminEndpoint, auditProfileView, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -972,7 +1024,7 @@ app.post('/api/admin/users/:userId/approve', applyRateLimit('sensitive'), authen
 }));
 
 // Update user status (activate/deactivate)
-app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authenticateToken, requireAdmin, validateAdminEndpoint, asyncHandler(async (req, res) => {
+app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authenticateToken, requireAdmin, validateUserId, validateAdminEndpoint, asyncHandler(async (req, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
@@ -1495,7 +1547,7 @@ app.post('/api/admin/users/bulk-reject', applyRateLimit('bulk'), authenticateTok
 }));
 
 // Enhanced Dashboard Statistics for admin panel metrics
-app.get('/api/admin/dashboard/stats', authenticateToken, requireAdmin, validateAdminEndpoint, auditDashboardAccess, async (req, res) => {
+app.get('/api/admin/dashboard/stats', authenticateToken, requireAdmin, validateDashboardQuery, validateAdminEndpoint, auditDashboardAccess, async (req, res) => {
   try {
     // Basic user counts
     const totalUsers = await User.countDocuments();
@@ -1767,7 +1819,7 @@ app.use((err, req, res, next) => {
 // Audit Log Management Routes
 
 // Get audit logs with filtering and pagination
-app.get('/api/admin/audit-logs', authenticateToken, requireAdmin, validateAdminEndpoint, async (req, res) => {
+app.get('/api/admin/audit-logs', authenticateToken, requireAdmin, validateAuditLogQuery, validateAdminEndpoint, async (req, res) => {
   try {
     const {
       page = 1,
@@ -1913,7 +1965,7 @@ app.get('/api/admin/audit-logs', authenticateToken, requireAdmin, validateAdminE
 });
 
 // Get audit logs for a specific user
-app.get('/api/admin/audit-logs/user/:userId', authenticateToken, requireAdmin, validateAdminEndpoint, async (req, res) => {
+app.get('/api/admin/audit-logs/user/:userId', authenticateToken, requireAdmin, validateUserId, validateAdminEndpoint, async (req, res) => {
   try {
     const { userId } = req.params;
     const { page = 1, limit = 20 } = req.query;
@@ -1963,7 +2015,7 @@ app.get('/api/admin/audit-logs/user/:userId', authenticateToken, requireAdmin, v
 });
 
 // Get audit logs for a specific admin
-app.get('/api/admin/audit-logs/admin/:adminId', authenticateToken, requireAdmin, validateAdminEndpoint, async (req, res) => {
+app.get('/api/admin/audit-logs/admin/:adminId', authenticateToken, requireAdmin, validateCommonParams, validateAdminEndpoint, async (req, res) => {
   try {
     const { adminId } = req.params;
     const { page = 1, limit = 20 } = req.query;
@@ -2014,7 +2066,7 @@ app.get('/api/admin/audit-logs/admin/:adminId', authenticateToken, requireAdmin,
 });
 
 // Get audit statistics
-app.get('/api/admin/audit-logs/stats', authenticateToken, requireAdmin, validateAdminEndpoint, async (req, res) => {
+app.get('/api/admin/audit-logs/stats', authenticateToken, requireAdmin, validateAuditLogQuery, validateAdminEndpoint, async (req, res) => {
   try {
     const { dateFrom, dateTo, period = '7d' } = req.query;
 
@@ -2087,7 +2139,7 @@ app.get('/api/admin/audit-logs/stats', authenticateToken, requireAdmin, validate
 });
 
 // Get available audit log filter options
-app.get('/api/admin/audit-logs/filters', authenticateToken, requireAdmin, validateAdminEndpoint, async (req, res) => {
+app.get('/api/admin/audit-logs/filters', authenticateToken, requireAdmin, validateCommonParams, validateAdminEndpoint, async (req, res) => {
   try {
     const [actions, resources, admins] = await Promise.all([
       AuditLog.distinct('action'),
@@ -2219,14 +2271,14 @@ app.use('*', (req, res, next) => {
   next(error);
 });
 
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
 // Setup global error handlers for unhandled rejections and exceptions
 setupGlobalErrorHandlers();
-
-// Setup database connection error handlers
-handleDatabaseConnectionError();
 
 // Start server
 app.listen(config.PORT, '0.0.0.0', () => {

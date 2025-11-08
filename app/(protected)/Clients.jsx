@@ -1,16 +1,15 @@
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import Svg, { Path } from "react-native-svg";
 
 import {
-    Poppins_300Light,
+Poppins_300Light,
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     useFonts,
 } from "@expo-google-fonts/poppins";
 import {
-    ActivityIndicator,
     Image,
     Modal,
     RefreshControl,
@@ -21,7 +20,14 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import Logger from '../utils/logger';
 import ApiService from "../services/api";
+import ClientsSkeleton from '../components/ClientsSkeleton';
+import ProfileAvatar from '../components/ProfileAvatar';
+import LoadingGif from '../components/LoadingGif';
+
+
+
 // SVG Icons
 const SearchIcon = ({ size = 25, color = "#999" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +37,7 @@ const SearchIcon = ({ size = 25, color = "#999" }) => (
 
 export default function Clients() {
   const [searchText, setSearchText] = useState("");
-  const navigation = useNavigation();
+  const router = useRouter();
 
   const [filter, setFilter] = useState("All"); // All, Active, Inactive
   const [users, setUsers] = useState([]);
@@ -77,45 +83,28 @@ export default function Clients() {
       const response = await ApiService.getUsers(params);
 
       if (response.success) {
-        // Fetch user profiles for profile photos
-        console.log(`📋 Loading profiles for ${response.users.length} users...`);
+        Logger.log(`📋 Loaded ${response.users.length} users`);
         
-        const usersWithProfiles = await Promise.all(
-          response.users.map(async (user) => {
-            try {
-              const profileResponse = await ApiService.getUserProfile(user._id);
-              const profilePhoto = profileResponse.success 
-                ? profileResponse.userProfile.profilePhoto 
-                : null;
-              
-              console.log(`👤 ${user.firstName} ${user.lastName}: ${profilePhoto ? '✅ Has profile photo' : '❌ No profile photo'}`);
-              
-              return {
-                id: user._id,
-                name: `${user.firstName} ${user.lastName}`,
-                daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
-                status: user.isActive ? "Active" : "Inactive",
-                avatar: profilePhoto || user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
-                userData: user // Store full user data for navigation
-              };
-            } catch (err) {
-              console.log(`❌ Profile not found for user ${user.firstName} ${user.lastName} (${user._id}):`, err.message);
-              return {
-                id: user._id,
-                name: `${user.firstName} ${user.lastName}`,
-                daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
-                status: user.isActive ? "Active" : "Inactive",
-                avatar: user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
-                userData: user
-              };
-            }
-          })
-        );
+        // Map users directly - profile photo is already in user object
+        const usersData = response.users.map((user) => {
+          return {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            profilePhoto: user.profilePhoto,
+            gender: user.gender,
+            name: `${user.firstName} ${user.lastName}`,
+            daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
+            status: user.isActive ? "Active" : "Inactive",
+            userData: user // Store full user data for navigation
+          };
+        });
         
-        setUsers(usersWithProfiles);
+        setUsers(usersData);
       }
     } catch (err) {
-      console.error('Load users error:', err);
+      Logger.error('Load users error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -162,10 +151,10 @@ export default function Clients() {
         setModalVisible(false);
         await loadUsers(); // Reload to get fresh data
       } else {
-        console.error('Status change failed:', response.error);
+        Logger.error('Status change failed:', response.error);
       }
     } catch (err) {
-      console.error('Status change error:', err);
+      Logger.error('Status change error:', err);
     }
   };
 
@@ -219,7 +208,7 @@ export default function Clients() {
       >
         {loading && !refreshing && (
           <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <ActivityIndicator size="large" color="#d5ff5f" />
+            <LoadingGif size={100} />
             <Text style={{ color: '#fff', marginTop: 10 }}>Loading users...</Text>
           </View>
         )}
@@ -234,17 +223,19 @@ export default function Clients() {
             key={user.id}
             style={styles.userRow}
             onPress={() =>
-              navigation.push("ClientProfile", { 
-                userId: user.id,
-                user: JSON.stringify(user.userData || user) 
+              router.push({
+                pathname: "/ClientProfile",
+                params: { 
+                  userId: user.id,
+                  user: JSON.stringify(user.userData || user) 
+                }
               })
             }
           >
-            <Image 
-              source={{ uri: user.avatar }} 
+            <ProfileAvatar 
+              user={user} 
+              size={60}
               style={styles.avatar}
-              onLoad={() => console.log('✅ Avatar loaded for:', user.name)}
-              onError={(error) => console.log('❌ Avatar error for:', user.name, error.nativeEvent.error)}
             />
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
@@ -259,7 +250,10 @@ export default function Clients() {
             {user.status === "Active" && (
               <TouchableOpacity
                 style={{ marginRight: 15 }}
-                onPress={() => navigation.push("Chat", { userId: user.id })}
+                onPress={() => router.push({
+                  pathname: "/Chat",
+                  params: { userId: user.id }
+                })}
               >
                 <Svg width={25} height={25} viewBox="0 0 24 24" fill="none" stroke="#707070ff" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
                   <Path d="M21 15C21 16.6569 19.6569 18 18 18H7L3 22V4C3 2.34315 4.34315 1 6 1H18C19.6569 1 21 2.34315 21 4V15Z" />

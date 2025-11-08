@@ -1,8 +1,7 @@
 import { useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
+Alert,
   Linking,
   Modal,
   ScrollView,
@@ -12,8 +11,13 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import ListSkeleton from '../components/ListSkeleton';
+import LoadingGif from '../components/LoadingGif';
+
+
 // SVG Icons
 const SearchIcon = ({ size = 20, color = "#999" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -95,7 +99,7 @@ export default function ProfileSchedules() {
         setError('Failed to load exercises');
       }
     } catch (err) {
-      console.error('Load exercises error:', err);
+      Logger.error('Load exercises error:', err);
       setError('Failed to load exercises');
     } finally {
       setLoading(false);
@@ -123,7 +127,7 @@ export default function ProfileSchedules() {
 
     try {
       setSaving(true);
-      console.log('Sending exercise data:', form);
+      Logger.log('Sending exercise data:', form);
       
       if (isEditing && selectedExercise) {
         const response = await ApiService.updateExercise(selectedExercise._id, form);
@@ -134,7 +138,7 @@ export default function ProfileSchedules() {
           Alert.alert('Error', 'Failed to update exercise');
         }
       } else {
-        console.log('Creating new exercise with data:', form);
+        Logger.log('Creating new exercise with data:', form);
         const response = await ApiService.createExercise(form);
         if (response.success) {
           await loadExercises(); // Reload exercises
@@ -149,7 +153,7 @@ export default function ProfileSchedules() {
       setIsEditing(false);
       setSelectedExercise(null);
     } catch (error) {
-      console.error('Save exercise error:', error);
+      Logger.error('Save exercise error:', error);
       Alert.alert('Error', 'Failed to save exercise');
     } finally {
       setSaving(false);
@@ -166,7 +170,7 @@ export default function ProfileSchedules() {
         Alert.alert('Error', 'Failed to delete exercise');
       }
     } catch (error) {
-      console.error('Delete exercise error:', error);
+      Logger.error('Delete exercise error:', error);
       Alert.alert('Error', 'Failed to delete exercise');
     }
   };
@@ -174,7 +178,7 @@ export default function ProfileSchedules() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
         <Text style={{ color: '#fff', marginTop: 10 }}>Loading exercises...</Text>
       </View>
     );
@@ -334,7 +338,7 @@ export default function ProfileSchedules() {
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color="#000" />
+                <LoadingGif size={40} />
               ) : (
                 <Text style={styles.saveButtonText}>
                   {isEditing ? "Update Exercise" : "Save Exercise"}

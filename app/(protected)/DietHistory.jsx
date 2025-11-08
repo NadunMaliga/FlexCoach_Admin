@@ -2,9 +2,13 @@ import { Poppins_400Regular, Poppins_500Medium, useFonts } from "@expo-google-fo
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import Logger from '../utils/logger';
+import LoadingGif from '../components/LoadingGif';
+
+
 
 export default function DietHistory() {
     const [selectedMeal, setSelectedMeal] = useState(null);
@@ -17,8 +21,8 @@ export default function DietHistory() {
     const effectiveUserId = userId || "68e8fd08e8d1859ebd9edd05";
     
     // Debug logging to verify userId is being passed correctly
-    console.log('DietHistory - Received userId:', userId);
-    console.log('DietHistory - Using effectiveUserId:', effectiveUserId);
+    Logger.log('DietHistory - Received userId:', userId);
+    Logger.log('DietHistory - Using effectiveUserId:', effectiveUserId);
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -29,7 +33,7 @@ export default function DietHistory() {
     const loadDietHistory = useCallback(async () => {
         try {
             setLoading(true);
-            console.log('Loading diet history for userId:', effectiveUserId);
+            Logger.log('Loading diet history for userId:', effectiveUserId);
 
             // Try the new diet history API first
             try {
@@ -37,20 +41,20 @@ export default function DietHistory() {
                     limit: 50,
                     groupBy: 'date'
                 });
-                console.log('Diet history API response:', response);
+                Logger.log('Diet history API response:', response);
 
                 if (response.success && response.history && response.history.length > 0) {
                     // The API already returns data in the correct format for the UI
                     setHistory(response.history);
-                    console.log('Loaded history:', response.history.length, 'days');
+                    Logger.log('Loaded history:', response.history.length, 'days');
                     return;
                 }
             } catch (apiError) {
-                console.log('New diet history API not available, falling back to getUserDietPlans');
+                Logger.log('New diet history API not available, falling back to getUserDietPlans');
                 
                 // Fallback to the original API
                 const fallbackResponse = await ApiService.getUserDietPlans(effectiveUserId);
-                console.log('Fallback API response:', fallbackResponse);
+                Logger.log('Fallback API response:', fallbackResponse);
 
                 if (fallbackResponse.success && fallbackResponse.dietPlans && fallbackResponse.dietPlans.length > 0) {
                     // Transform API data to history format grouped by date
@@ -97,7 +101,7 @@ export default function DietHistory() {
                     );
 
                     setHistory(historyArray);
-                    console.log('Loaded fallback history:', historyArray.length, 'days');
+                    Logger.log('Loaded fallback history:', historyArray.length, 'days');
                     return;
                 }
             }
@@ -105,7 +109,7 @@ export default function DietHistory() {
             // No diet history found
             setHistory([]);
         } catch (err) {
-            console.error('Load diet history error:', err);
+            Logger.error('Load diet history error:', err);
             // Show empty state on error
             setHistory([]);
         } finally {
@@ -132,7 +136,7 @@ export default function DietHistory() {
     if (loading) {
         return (
             <View style={[{ flex: 1, backgroundColor: "#000" }, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#d5ff5f" />
+                <LoadingGif size={100} />
                 <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
                     Loading diet history...
                 </Text>

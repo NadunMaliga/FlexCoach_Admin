@@ -4,6 +4,7 @@ import {
   Poppins_600SemiBold,
   useFonts,
 } from "@expo-google-fonts/poppins";
+import Logger from './utils/logger';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -57,12 +58,12 @@ export default function SignIn() {
 
       if (success) {
         // Navigation will be handled automatically by AuthContext
-        console.log('Login successful, will auto-redirect to Dashboard');
+        Logger.log('Login successful, will auto-redirect to Dashboard');
       } else {
         setError("Invalid password");
       }
     } catch (err) {
-      console.error("Login error:", err);
+      Logger.error("Login error:", err);
       setError("Invalid password");
     } finally {
       setSubmitting(false);

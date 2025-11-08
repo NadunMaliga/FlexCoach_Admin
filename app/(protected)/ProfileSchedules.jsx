@@ -1,5 +1,5 @@
 import {
-    Poppins_400Regular,
+Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     useFonts,
@@ -8,7 +8,6 @@ import { useRoute } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
     Modal,
     ScrollView,
     StyleSheet,
@@ -16,8 +15,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 export default function ProfileSchedules() {
   const route = useRoute();
@@ -48,15 +50,15 @@ export default function ProfileSchedules() {
       // Get workoutId from route params or use a default for testing
       const workoutId = params?.workoutId || route.params?.workoutId || '68e8c961e2d97b8b23095123';
       
-      console.log('Loading workout details for ID:', workoutId);
+      Logger.log('Loading workout details for ID:', workoutId);
       
       const response = await ApiService.getWorkoutScheduleDetails(workoutId);
       
       if (response.success) {
         setWorkoutData(response.workoutSchedule);
         setExercises(response.exercises);
-        console.log('Loaded workout:', response.workoutSchedule.name);
-        console.log('Loaded exercises:', response.exercises.length);
+        Logger.log('Loaded workout:', response.workoutSchedule.name);
+        Logger.log('Loaded exercises:', response.exercises.length);
       } else {
         setError('Failed to load workout details');
         // Fallback to mock data
@@ -74,7 +76,7 @@ export default function ProfileSchedules() {
         ]);
       }
     } catch (err) {
-      console.error('Load workout details error:', err);
+      Logger.error('Load workout details error:', err);
       setError('Failed to load workout details');
       // Fallback to mock data
       setExercises([
@@ -176,7 +178,7 @@ export default function ProfileSchedules() {
       {/* Loading State */}
       {loading ? (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color="#d5ff5f" />
+          <LoadingGif size={100} />
           <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
             Loading workout details...
           </Text>

@@ -92,6 +92,18 @@ export default function ProtectedLayout() {
           title: 'Measurement History'
         }} 
       />
+      <Stack.Screen 
+        name="Chat" 
+        options={{ 
+          title: 'Chat'
+        }} 
+      />
+      <Stack.Screen 
+        name="ClientBodyImage" 
+        options={{ 
+          title: 'Body Images'
+        }} 
+      />
     </Stack>
   );
 }

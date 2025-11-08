@@ -1,8 +1,10 @@
 import { Poppins_300Light, useFonts } from '@expo-google-fonts/poppins';
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from './contexts/AuthContext';
+import LoadingGif from './components/LoadingGif';
+
 
 export default function Index() {
   const router = useRouter();
@@ -22,7 +24,7 @@ export default function Index() {
   if (!fontsLoaded || isLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
       </View>
     );
   }

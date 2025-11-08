@@ -1,342 +1,364 @@
 const { body, param, query, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
+const { ValidationError, ErrorCodes } = require('./errorHandler');
 
 /**
- * Validation middleware for FlexCoach Admin API endpoints
- * Provides comprehensive input validation for all admin operations
+ * Comprehensive Input Validation Middleware for FlexCoach Admin Backend
+ * Provides security-focused validation for all API endpoints
  */
 
-// Error response formatter for validation errors
-const formatValidationErrors = (errors) => {
-  return {
-    success: false,
-    error: 'Validation failed',
-    code: 'VALIDATION_FAILED',
-    details: errors.array().map(err => ({
-      field: err.path || err.param,
-      message: err.msg,
-      value: err.value,
-      location: err.location
-    })),
-    timestamp: new Date().toISOString()
-  };
+// Common validation patterns
+const VALIDATION_PATTERNS = {
+  email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+  name: /^[a-zA-Z\s'-]{1,50}$/,
+  mobile: /^[\+]?[1-9][\d]{0,15}$/,
+  objectId: /^[0-9a-fA-F]{24}$/,
+  url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
+  alphanumeric: /^[a-zA-Z0-9]+$/,
+  slug: /^[a-z0-9-]+$/,
+  hexColor: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
 };
 
-// Middleware to handle validation results
-const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json(formatValidationErrors(errors));
-  }
-  next();
+// Sanitization helpers
+const sanitizeString = (str) => {
+  if (typeof str !== 'string') return str;
+  return str.trim().replace(/[<>]/g, '');
+};
+
+const sanitizeEmail = (email) => {
+  if (typeof email !== 'string') return email;
+  return email.toLowerCase().trim();
 };
 
 // Custom validators
-const customValidators = {
-  // Validate MongoDB ObjectId
-  isValidObjectId: (value) => {
-    if (!mongoose.Types.ObjectId.isValid(value)) {
-      throw new Error('Invalid ObjectId format');
-    }
-    return true;
-  },
-
-  // Validate user status
-  isValidUserStatus: (value) => {
-    const validStatuses = ['pending', 'approved', 'rejected'];
-    if (!validStatuses.includes(value)) {
-      throw new Error(`Status must be one of: ${validStatuses.join(', ')}`);
-    }
-    return true;
-  },
-
-  // Validate training mode
-  isValidTrainingMode: (value) => {
-    const validModes = ['Online', 'Physical Training', 'Both Options', 'Schedule Only'];
-    if (!validModes.includes(value)) {
-      throw new Error(`Training mode must be one of: ${validModes.join(', ')}`);
-    }
-    return true;
-  },
-
-  // Validate gender
-  isValidGender: (value) => {
-    const validGenders = ['Male', 'Female', 'Other'];
-    if (!validGenders.includes(value)) {
-      throw new Error(`Gender must be one of: ${validGenders.join(', ')}`);
-    }
-    return true;
-  },
-
-  // Validate sort order
-  isValidSortOrder: (value) => {
-    const validOrders = ['asc', 'desc'];
-    if (!validOrders.includes(value)) {
-      throw new Error(`Sort order must be one of: ${validOrders.join(', ')}`);
-    }
-    return true;
-  },
-
-  // Validate date format
-  isValidDate: (value) => {
-    const date = new Date(value);
-    if (isNaN(date.getTime())) {
-      throw new Error('Invalid date format');
-    }
-    return true;
-  },
-
-  // Validate pagination limit
-  isValidLimit: (value) => {
-    const limit = parseInt(value);
-    if (isNaN(limit) || limit < 1 || limit > 100) {
-      throw new Error('Limit must be a number between 1 and 100');
-    }
-    return true;
-  },
-
-  // Validate pagination page
-  isValidPage: (value) => {
-    const page = parseInt(value);
-    if (isNaN(page) || page < 1) {
-      throw new Error('Page must be a positive number');
-    }
-    return true;
-  }
+const isValidObjectId = (value) => {
+  return mongoose.Types.ObjectId.isValid(value);
 };
 
-// Admin Authentication Validation
+const isValidDate = (value) => {
+  const date = new Date(value);
+  return date instanceof Date && !isNaN(date);
+};
+
+const isValidEnum = (allowedValues) => {
+  return (value) => allowedValues.includes(value);
+};
+
+// Validation result handler
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  
+  if (!errors.isEmpty()) {
+    const formattedErrors = errors.array().map(error => ({
+      field: error.path || error.param,
+      message: error.msg,
+      value: error.value,
+      location: error.location
+    }));
+
+    console.warn('🚫 Validation failed:', {
+      endpoint: `${req.method} ${req.originalUrl}`,
+      errors: formattedErrors,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed',
+      code: ErrorCodes.VALIDATION_ERROR,
+      details: formattedErrors
+    });
+  }
+  
+  next();
+};
+
+// Authentication validation
 const validateAdminLogin = [
   body('email')
     .isEmail()
     .normalizeEmail()
     .withMessage('Valid email address is required')
-    .isLength({ min: 5, max: 100 })
-    .withMessage('Email must be between 5 and 100 characters'),
+    .isLength({ max: 254 })
+    .withMessage('Email must be less than 254 characters')
+    .custom((value) => {
+      if (!VALIDATION_PATTERNS.email.test(value)) {
+        throw new Error('Invalid email format');
+      }
+      return true;
+    }),
   
   body('password')
-    .isLength({ min: 1 })
+    .isLength({ min: 8, max: 128 })
+    .withMessage('Password must be between 8 and 128 characters')
+    .notEmpty()
     .withMessage('Password is required')
-    .isLength({ max: 200 })
-    .withMessage('Password is too long'),
+    .custom((value) => {
+      // Check for common weak passwords
+      const weakPasswords = ['password', '123456', 'admin', 'test'];
+      if (weakPasswords.includes(value.toLowerCase())) {
+        throw new Error('Password is too weak');
+      }
+      return true;
+    }),
+  
+  // Sanitize inputs
+  body('email').customSanitizer(sanitizeEmail),
+  body('password').customSanitizer(sanitizeString),
   
   handleValidationErrors
 ];
 
-// User ID Parameter Validation
+// User management validation
 const validateUserId = [
   param('userId')
-    .custom(customValidators.isValidObjectId)
-    .withMessage('Invalid user ID format'),
+    .custom(isValidObjectId)
+    .withMessage('Invalid user ID format')
+    .isLength({ min: 24, max: 24 })
+    .withMessage('User ID must be exactly 24 characters'),
   
   handleValidationErrors
 ];
 
-// User Management Query Validation
 const validateUserListQuery = [
   query('page')
     .optional()
-    .custom(customValidators.isValidPage),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page must be a positive integer between 1 and 1000')
+    .toInt(),
   
   query('limit')
     .optional()
-    .custom(customValidators.isValidLimit),
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+    .toInt(),
   
   query('status')
     .optional()
-    .custom(customValidators.isValidUserStatus),
+    .custom(isValidEnum(['pending', 'approved', 'rejected']))
+    .withMessage('Status must be pending, approved, or rejected'),
   
-  query('trainingMode')
+  query('search')
     .optional()
-    .custom(customValidators.isValidTrainingMode),
-  
-  query('gender')
-    .optional()
-    .custom(customValidators.isValidGender),
+    .isLength({ max: 100 })
+    .withMessage('Search term must be less than 100 characters')
+    .customSanitizer(sanitizeString),
   
   query('sortBy')
     .optional()
-    .isIn(['createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'status', 'trainingMode', 'gender', 'birthday', 'approvedAt', 'rejectedAt'])
+    .custom(isValidEnum([
+      'createdAt', 'updatedAt', 'firstName', 'lastName', 'email',
+      'status', 'trainingMode', 'gender', 'birthday', 'approvedAt', 'rejectedAt'
+    ]))
     .withMessage('Invalid sort field'),
   
   query('sortOrder')
     .optional()
-    .custom(customValidators.isValidSortOrder),
+    .custom(isValidEnum(['asc', 'desc']))
+    .withMessage('Sort order must be asc or desc'),
+  
+  query('trainingMode')
+    .optional()
+    .custom(isValidEnum(['Online', 'Physical Training', 'Both Options', 'Schedule Only']))
+    .withMessage('Invalid training mode'),
+  
+  query('gender')
+    .optional()
+    .custom(isValidEnum(['Male', 'Female', 'Other']))
+    .withMessage('Invalid gender'),
   
   query('isActive')
     .optional()
     .isBoolean()
-    .withMessage('isActive must be a boolean value'),
+    .withMessage('isActive must be a boolean')
+    .toBoolean(),
   
   query('onboardingCompleted')
     .optional()
     .isBoolean()
-    .withMessage('onboardingCompleted must be a boolean value'),
+    .withMessage('onboardingCompleted must be a boolean')
+    .toBoolean(),
   
   query('hasProfilePhoto')
     .optional()
     .isBoolean()
-    .withMessage('hasProfilePhoto must be a boolean value'),
+    .withMessage('hasProfilePhoto must be a boolean')
+    .toBoolean(),
   
   query('dateFrom')
     .optional()
-    .custom(customValidators.isValidDate),
+    .isISO8601()
+    .withMessage('dateFrom must be a valid ISO 8601 date')
+    .toDate(),
   
   query('dateTo')
     .optional()
-    .custom(customValidators.isValidDate),
+    .isISO8601()
+    .withMessage('dateTo must be a valid ISO 8601 date')
+    .toDate(),
   
   query('approvedBy')
     .optional()
-    .custom(customValidators.isValidObjectId),
-  
-  query('search')
-    .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Search term must be between 1 and 100 characters')
-    .trim(),
+    .custom(isValidObjectId)
+    .withMessage('approvedBy must be a valid ObjectId'),
   
   handleValidationErrors
 ];
 
-// User Rejection Validation
 const validateUserRejection = [
   param('userId')
-    .custom(customValidators.isValidObjectId)
+    .custom(isValidObjectId)
     .withMessage('Invalid user ID format'),
   
   body('reason')
     .optional()
-    .isLength({ min: 1, max: 500 })
-    .withMessage('Rejection reason must be between 1 and 500 characters')
-    .trim(),
+    .isLength({ max: 500 })
+    .withMessage('Rejection reason must be less than 500 characters')
+    .customSanitizer(sanitizeString),
   
   handleValidationErrors
 ];
 
-// Bulk Operations Validation
 const validateBulkUserAction = [
   body('userIds')
     .isArray({ min: 1, max: 50 })
-    .withMessage('userIds must be an array with 1-50 user IDs'),
-  
-  body('userIds.*')
-    .custom(customValidators.isValidObjectId)
-    .withMessage('Each user ID must be a valid ObjectId'),
+    .withMessage('userIds must be an array with 1-50 items')
+    .custom((userIds) => {
+      if (!userIds.every(id => isValidObjectId(id))) {
+        throw new Error('All user IDs must be valid ObjectIds');
+      }
+      return true;
+    }),
   
   handleValidationErrors
 ];
 
-// Bulk Rejection Validation
 const validateBulkUserRejection = [
   body('userIds')
     .isArray({ min: 1, max: 50 })
-    .withMessage('userIds must be an array with 1-50 user IDs'),
-  
-  body('userIds.*')
-    .custom(customValidators.isValidObjectId)
-    .withMessage('Each user ID must be a valid ObjectId'),
+    .withMessage('userIds must be an array with 1-50 items')
+    .custom((userIds) => {
+      if (!userIds.every(id => isValidObjectId(id))) {
+        throw new Error('All user IDs must be valid ObjectIds');
+      }
+      return true;
+    }),
   
   body('reason')
     .optional()
-    .isLength({ min: 1, max: 500 })
-    .withMessage('Rejection reason must be between 1 and 500 characters')
-    .trim(),
+    .isLength({ max: 500 })
+    .withMessage('Rejection reason must be less than 500 characters')
+    .customSanitizer(sanitizeString),
   
   handleValidationErrors
 ];
 
-// Dashboard Query Validation
+// Dashboard validation
 const validateDashboardQuery = [
   query('period')
     .optional()
-    .isIn(['7d', '30d', '90d', '1y'])
-    .withMessage('Period must be one of: 7d, 30d, 90d, 1y'),
+    .custom(isValidEnum(['day', 'week', 'month', 'year']))
+    .withMessage('Period must be day, week, month, or year'),
   
-  query('includeDetails')
+  query('startDate')
     .optional()
-    .isBoolean()
-    .withMessage('includeDetails must be a boolean value'),
+    .isISO8601()
+    .withMessage('startDate must be a valid ISO 8601 date')
+    .toDate(),
+  
+  query('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('endDate must be a valid ISO 8601 date')
+    .toDate(),
   
   handleValidationErrors
 ];
 
-// Audit Log Query Validation
+// Audit log validation
 const validateAuditLogQuery = [
   query('page')
     .optional()
-    .custom(customValidators.isValidPage),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page must be between 1 and 1000')
+    .toInt(),
   
   query('limit')
     .optional()
-    .custom(customValidators.isValidLimit),
-  
-  query('adminId')
-    .optional()
-    .custom(customValidators.isValidObjectId),
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+    .toInt(),
   
   query('action')
     .optional()
-    .isIn(['user_approved', 'user_rejected', 'user_created', 'user_updated', 'admin_login', 'admin_logout', 'admin_created', 'admin_updated', 'settings_updated', 'bulk_action', 'export_data'])
-    .withMessage('Invalid action type'),
+    .isLength({ max: 50 })
+    .withMessage('Action must be less than 50 characters')
+    .customSanitizer(sanitizeString),
   
-  query('resource')
+  query('adminId')
     .optional()
-    .isIn(['user', 'admin', 'system'])
-    .withMessage('Resource must be one of: user, admin, system'),
+    .custom(isValidObjectId)
+    .withMessage('adminId must be a valid ObjectId'),
   
-  query('dateFrom')
+  query('startDate')
     .optional()
-    .custom(customValidators.isValidDate),
+    .isISO8601()
+    .withMessage('startDate must be a valid ISO 8601 date')
+    .toDate(),
   
-  query('dateTo')
+  query('endDate')
     .optional()
-    .custom(customValidators.isValidDate),
+    .isISO8601()
+    .withMessage('endDate must be a valid ISO 8601 date')
+    .toDate(),
   
   handleValidationErrors
 ];
 
-// Export Query Validation
+// Export validation
 const validateExportQuery = [
   query('format')
     .optional()
-    .isIn(['csv', 'json', 'excel'])
-    .withMessage('Format must be one of: csv, json, excel'),
+    .custom(isValidEnum(['csv', 'json', 'xlsx']))
+    .withMessage('Format must be csv, json, or xlsx'),
   
-  query('status')
-    .optional()
-    .custom(customValidators.isValidUserStatus),
+  query('type')
+    .custom(isValidEnum(['users', 'audit-logs', 'dashboard-stats']))
+    .withMessage('Type must be users, audit-logs, or dashboard-stats'),
   
-  query('dateFrom')
+  query('startDate')
     .optional()
-    .custom(customValidators.isValidDate),
+    .isISO8601()
+    .withMessage('startDate must be a valid ISO 8601 date')
+    .toDate(),
   
-  query('dateTo')
+  query('endDate')
     .optional()
-    .custom(customValidators.isValidDate),
-  
-  query('includePersonalData')
-    .optional()
-    .isBoolean()
-    .withMessage('includePersonalData must be a boolean value'),
+    .isISO8601()
+    .withMessage('endDate must be a valid ISO 8601 date')
+    .toDate(),
   
   handleValidationErrors
 ];
 
-// Admin Profile Update Validation
+// Admin profile validation
 const validateAdminProfileUpdate = [
   body('username')
     .optional()
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Username must be between 3 and 50 characters')
-    .matches(/^[a-zA-Z0-9_-]+$/)
-    .withMessage('Username can only contain letters, numbers, underscores, and hyphens'),
+    .isLength({ min: 3, max: 30 })
+    .withMessage('Username must be between 3 and 30 characters')
+    .matches(VALIDATION_PATTERNS.alphanumeric)
+    .withMessage('Username must contain only letters and numbers')
+    .customSanitizer(sanitizeString),
   
   body('email')
     .optional()
     .isEmail()
     .normalizeEmail()
-    .withMessage('Valid email address is required'),
+    .withMessage('Valid email address is required')
+    .customSanitizer(sanitizeEmail),
   
   body('currentPassword')
     .if(body('newPassword').exists())
@@ -347,120 +369,191 @@ const validateAdminProfileUpdate = [
     .optional()
     .isLength({ min: 8, max: 128 })
     .withMessage('New password must be between 8 and 128 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character'),
+    .matches(VALIDATION_PATTERNS.password)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
   
   handleValidationErrors
 ];
 
-// System Settings Validation
+// System settings validation
 const validateSystemSettings = [
-  body('settings')
-    .isObject()
-    .withMessage('Settings must be an object'),
-  
-  body('settings.*.value')
-    .exists()
-    .withMessage('Each setting must have a value'),
-  
-  body('settings.*.description')
+  body('maxUsersPerPage')
     .optional()
-    .isLength({ max: 200 })
-    .withMessage('Setting description must be less than 200 characters'),
+    .isInt({ min: 10, max: 100 })
+    .withMessage('maxUsersPerPage must be between 10 and 100')
+    .toInt(),
+  
+  body('sessionTimeout')
+    .optional()
+    .isInt({ min: 300, max: 86400 })
+    .withMessage('sessionTimeout must be between 300 and 86400 seconds')
+    .toInt(),
+  
+  body('enableAuditLogging')
+    .optional()
+    .isBoolean()
+    .withMessage('enableAuditLogging must be a boolean')
+    .toBoolean(),
+  
+  body('maintenanceMode')
+    .optional()
+    .isBoolean()
+    .withMessage('maintenanceMode must be a boolean')
+    .toBoolean(),
   
   handleValidationErrors
 ];
 
-// Rate Limiting Validation
-const validateRateLimitQuery = [
-  query('windowMs')
+// Common parameter validation
+const validateCommonParams = [
+  param('id')
     .optional()
-    .isInt({ min: 60000, max: 3600000 })
-    .withMessage('Window must be between 1 minute and 1 hour (in milliseconds)'),
-  
-  query('maxRequests')
-    .optional()
-    .isInt({ min: 1, max: 1000 })
-    .withMessage('Max requests must be between 1 and 1000'),
+    .custom(isValidObjectId)
+    .withMessage('ID must be a valid ObjectId'),
   
   handleValidationErrors
 ];
 
-// Generic validation middleware for common patterns
-const validateCommonParams = {
-  // Validate ObjectId in URL parameters
-  objectId: (paramName = 'id') => [
-    param(paramName)
-      .custom(customValidators.isValidObjectId)
-      .withMessage(`Invalid ${paramName} format`),
-    handleValidationErrors
-  ],
+// File upload validation
+const validateFileUpload = (allowedTypes = [], maxSize = 10 * 1024 * 1024) => {
+  return (req, res, next) => {
+    if (!req.file) {
+      return next();
+    }
 
-  // Validate pagination parameters
-  pagination: [
-    query('page')
-      .optional()
-      .custom(customValidators.isValidPage),
-    query('limit')
-      .optional()
-      .custom(customValidators.isValidLimit),
-    handleValidationErrors
-  ],
+    // Validate file type
+    if (allowedTypes.length > 0 && !allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid file type',
+        code: ErrorCodes.INVALID_FILE_TYPE,
+        allowedTypes
+      });
+    }
 
-  // Validate date range parameters
-  dateRange: [
-    query('dateFrom')
-      .optional()
-      .custom(customValidators.isValidDate),
-    query('dateTo')
-      .optional()
-      .custom(customValidators.isValidDate)
-      .custom((value, { req }) => {
-        if (req.query.dateFrom && value) {
-          const fromDate = new Date(req.query.dateFrom);
-          const toDate = new Date(value);
-          if (toDate < fromDate) {
-            throw new Error('End date must be after start date');
-          }
-        }
-        return true;
-      }),
-    handleValidationErrors
-  ]
+    // Validate file size
+    if (req.file.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        error: 'File too large',
+        code: ErrorCodes.FILE_TOO_LARGE,
+        maxSize: `${Math.round(maxSize / 1024 / 1024)}MB`
+      });
+    }
+
+    // Validate filename
+    const filename = req.file.originalname;
+    if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid filename',
+        code: ErrorCodes.INVALID_FILENAME
+      });
+    }
+
+    next();
+  };
+};
+
+// Rate limiting validation
+const validateRateLimitHeaders = (req, res, next) => {
+  // Add rate limit information to response headers
+  const rateLimitInfo = req.rateLimit;
+  if (rateLimitInfo) {
+    res.set({
+      'X-RateLimit-Limit': rateLimitInfo.limit,
+      'X-RateLimit-Remaining': rateLimitInfo.remaining,
+      'X-RateLimit-Reset': new Date(Date.now() + rateLimitInfo.resetTime)
+    });
+  }
+  next();
+};
+
+// Security headers validation
+const validateSecurityHeaders = (req, res, next) => {
+  // Check for required security headers in requests
+  const requiredHeaders = ['user-agent'];
+  const missingHeaders = requiredHeaders.filter(header => !req.get(header));
+  
+  if (missingHeaders.length > 0) {
+    console.warn('🚫 Missing security headers:', {
+      endpoint: `${req.method} ${req.originalUrl}`,
+      missingHeaders,
+      ip: req.ip
+    });
+  }
+  
+  next();
+};
+
+// Custom validation for specific business logic
+const validateBusinessRules = {
+  // Ensure user approval makes sense
+  userApproval: (req, res, next) => {
+    // Add custom business logic validation here
+    next();
+  },
+  
+  // Validate date ranges
+  dateRange: (req, res, next) => {
+    const { startDate, endDate } = req.query;
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start >= end) {
+        return res.status(400).json({
+          success: false,
+          error: 'Start date must be before end date',
+          code: ErrorCodes.INVALID_DATE_RANGE
+        });
+      }
+      
+      // Limit date range to prevent performance issues
+      const maxRange = 365 * 24 * 60 * 60 * 1000; // 1 year
+      if (end - start > maxRange) {
+        return res.status(400).json({
+          success: false,
+          error: 'Date range cannot exceed 1 year',
+          code: ErrorCodes.DATE_RANGE_TOO_LARGE
+        });
+      }
+    }
+    
+    next();
+  }
 };
 
 module.exports = {
-  // Authentication validators
+  // Main validation functions
   validateAdminLogin,
-  
-  // User management validators
   validateUserId,
   validateUserListQuery,
   validateUserRejection,
   validateBulkUserAction,
   validateBulkUserRejection,
-  
-  // Dashboard validators
   validateDashboardQuery,
-  
-  // Audit log validators
   validateAuditLogQuery,
-  
-  // Export validators
   validateExportQuery,
-  
-  // Admin profile validators
   validateAdminProfileUpdate,
-  
-  // System validators
   validateSystemSettings,
-  validateRateLimitQuery,
-  
-  // Common validators
   validateCommonParams,
   
   // Utility functions
+  validateFileUpload,
+  validateRateLimitHeaders,
+  validateSecurityHeaders,
+  validateBusinessRules,
   handleValidationErrors,
-  formatValidationErrors,
-  customValidators
+  
+  // Helper functions
+  sanitizeString,
+  sanitizeEmail,
+  isValidObjectId,
+  isValidDate,
+  isValidEnum,
+  
+  // Patterns
+  VALIDATION_PATTERNS
 };

@@ -1,8 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
+Dimensions,
     Image,
     Modal,
     Pressable,
@@ -12,7 +11,10 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Logger from '../utils/logger';
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 const screenWidth = Dimensions.get("window").width;
 const imageMargin = 10;
@@ -28,11 +30,11 @@ export default function ClientBodyImage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('🔍 ClientBodyImage useEffect - userId:', userId);
+    Logger.debug('ClientBodyImage useEffect - userId:', userId);
     if (userId) {
       loadUserPhotos();
     } else {
-      console.log('❌ No userId provided');
+      Logger.log('❌ No userId provided');
       setError('No user ID provided');
       setLoading(false);
     }
@@ -43,18 +45,18 @@ export default function ClientBodyImage() {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Loading photos for userId:', userId);
+      Logger.debug('Loading photos for userId:', userId);
       
       const response = await ApiService.getUserPhotos(userId);
       
-      console.log('📸 Photos API response:', response);
+      Logger.log('📸 Photos API response:', response);
       
       if (response.success) {
-        console.log('✅ Photos loaded successfully:', response.photos.length, 'photos');
+        Logger.success('Photos loaded successfully:', response.photos.length, 'photos');
         
         // Transform backend data to match component format
         const transformedPhotos = response.photos.map(photo => {
-          console.log('🖼️ Processing photo:', {
+          Logger.debug('Processing photo:', {
             id: photo._id,
             date: photo.date,
             photos: photo.photos,
@@ -73,18 +75,18 @@ export default function ClientBodyImage() {
           };
         });
         
-        console.log('🔄 Transformed photos:', transformedPhotos);
+        Logger.log('🔄 Transformed photos:', transformedPhotos);
         setPhotos(transformedPhotos);
       } else {
-        console.log('❌ Photos API failed:', response);
+        Logger.log('❌ Photos API failed:', response);
         setError('Failed to load photos');
       }
     } catch (err) {
-      console.error('❌ Error loading photos:', err);
+      Logger.failure('Error loading photos:', err);
       setError(err.message || 'Failed to load photos');
       
       // Set sample data as fallback for testing
-      console.log('🔄 Setting fallback sample data');
+      Logger.log('🔄 Setting fallback sample data');
       setPhotos([
         {
           id: 'sample-1',
@@ -102,7 +104,7 @@ export default function ClientBodyImage() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
         <Text style={{ color: '#fff', marginTop: 10 }}>Loading photos...</Text>
       </View>
     );
@@ -154,7 +156,7 @@ export default function ClientBodyImage() {
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {photos.map((item, idx) => {
-            console.log('🖼️ Rendering photo item:', idx, item);
+            Logger.debug('Rendering photo item:', idx, item);
             return (
             <View key={item.id || idx} style={styles.row}>
               <TouchableOpacity
@@ -165,8 +167,8 @@ export default function ClientBodyImage() {
                   source={{ uri: item.front || 'https://picsum.photos/300/400?random=1' }}
                   style={styles.photo}
                   resizeMode="contain"
-                  onLoad={() => console.log('✅ Front image loaded:', item.front)}
-                  onError={(error) => console.log('❌ Front image error:', error.nativeEvent.error, 'URL:', item.front)}
+                  onLoad={() => Logger.success('Front image loaded:', item.front)}
+                  onError={(error) => Logger.log('❌ Front image error:', error.nativeEvent.error, 'URL:', item.front)}
                 />
                 <Text style={styles.date}>{item.date}</Text>
               </TouchableOpacity>
@@ -179,8 +181,8 @@ export default function ClientBodyImage() {
                   source={{ uri: item.side || 'https://picsum.photos/300/400?random=2' }}
                   style={styles.photo}
                   resizeMode="contain"
-                  onLoad={() => console.log('✅ Side image loaded:', item.side)}
-                  onError={(error) => console.log('❌ Side image error:', error.nativeEvent.error, 'URL:', item.side)}
+                  onLoad={() => Logger.success('Side image loaded:', item.side)}
+                  onError={(error) => Logger.log('❌ Side image error:', error.nativeEvent.error, 'URL:', item.side)}
                 />
                 <Text style={styles.date}>{item.date}</Text>
               </TouchableOpacity>
@@ -193,8 +195,8 @@ export default function ClientBodyImage() {
                   source={{ uri: item.back || 'https://picsum.photos/300/400?random=3' }}
                   style={styles.photo}
                   resizeMode="contain"
-                  onLoad={() => console.log('✅ Back image loaded:', item.back)}
-                  onError={(error) => console.log('❌ Back image error:', error.nativeEvent.error, 'URL:', item.back)}
+                  onLoad={() => Logger.success('Back image loaded:', item.back)}
+                  onError={(error) => Logger.log('❌ Back image error:', error.nativeEvent.error, 'URL:', item.back)}
                 />
                 <Text style={styles.date}>{item.date}</Text>
               </TouchableOpacity>

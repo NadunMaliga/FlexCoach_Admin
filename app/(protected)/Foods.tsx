@@ -1,7 +1,6 @@
 import React from "react";
 import {
-  ActivityIndicator,
-  Alert,
+Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -10,8 +9,13 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import ListSkeleton from '../components/ListSkeleton';
+import LoadingGif from '../components/LoadingGif';
+
+
 
 // SVG Icons
 const SearchIcon = ({ size = 20, color = "#999" }) => (
@@ -100,7 +104,7 @@ export default function Foods() {
         setError('Failed to load foods');
       }
     } catch (err) {
-      console.error('Load foods error:', err);
+      Logger.error('Load foods error:', err);
       setError('Failed to load foods');
     } finally {
       setLoading(false);
@@ -121,7 +125,7 @@ export default function Foods() {
 
     try {
       setSaving(true);
-      console.log('Sending food data:', form);
+      Logger.log('Sending food data:', form);
       
       if (isEditing && selectedFood) {
         const response = await ApiService.updateFood(selectedFood._id, form);
@@ -132,7 +136,7 @@ export default function Foods() {
           Alert.alert('Error', 'Failed to update food');
         }
       } else {
-        console.log('Creating new food with data:', form);
+        Logger.log('Creating new food with data:', form);
         const response = await ApiService.createFood(form);
         if (response.success) {
           await loadFoods(); // Reload foods
@@ -157,7 +161,7 @@ export default function Foods() {
       setIsEditing(false);
       setSelectedFood(null);
     } catch (error) {
-      console.error('Save food error:', error);
+      Logger.error('Save food error:', error);
       Alert.alert('Error', 'Failed to save food');
     } finally {
       setSaving(false);
@@ -174,7 +178,7 @@ export default function Foods() {
         Alert.alert('Error', 'Failed to delete food');
       }
     } catch (error) {
-      console.error('Delete food error:', error);
+      Logger.error('Delete food error:', error);
       Alert.alert('Error', 'Failed to delete food');
     }
   };
@@ -182,7 +186,7 @@ export default function Foods() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#d5ff5f" />
+        <LoadingGif size={100} />
         <Text style={{ color: '#fff', marginTop: 10 }}>Loading foods...</Text>
       </View>
     );
@@ -333,7 +337,7 @@ export default function Foods() {
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color="#000" />
+                <LoadingGif size={40} />
               ) : (
                 <Text style={styles.saveButtonText}>
                   {isEditing ? "Update Food" : "Save Food"}

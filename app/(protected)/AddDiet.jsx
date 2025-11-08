@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
@@ -13,13 +12,16 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import Logger from '../utils/logger';
+import LoadingGif from '../components/LoadingGif';
+
 
 // Safe API import
 let ApiService = null;
 try {
   ApiService = require("../services/api").default;
 } catch (error) {
-  console.error("Failed to import ApiService:", error);
+  Logger.error("Failed to import ApiService:", error);
 }
 
 export default function AddDiet() {
@@ -64,10 +66,10 @@ export default function AddDiet() {
       if (response.success && response.foods) {
         const foodNames = response.foods.map(food => food.name);
         setFoodOptions(foodNames);
-        console.log(`Loaded ${foodNames.length} foods from database`);
+        Logger.log(`Loaded ${foodNames.length} foods from database`);
       }
     } catch (error) {
-      console.error('Error loading foods:', error);
+      Logger.error('Error loading foods:', error);
     } finally {
       setLoadingFoods(false);
     }
@@ -83,10 +85,10 @@ export default function AddDiet() {
       if (response.success && response.dietPlans) {
         const existingNames = response.dietPlans.map(plan => plan.name);
         setExistingMealPlans(existingNames);
-        console.log('Existing meal plans:', existingNames);
+        Logger.log('Existing meal plans:', existingNames);
       }
     } catch (error) {
-      console.error('Error loading existing meal plans:', error);
+      Logger.error('Error loading existing meal plans:', error);
     }
   };
 
@@ -156,7 +158,7 @@ export default function AddDiet() {
           foods: foods.map(food => {
             // Extract numeric part for quantity field, keep full text in unit field
             const numericMatch = food.quantity.match(/^\d+(\.\d+)?/);
-            const numericPart = numericMatch ? parseFloat(numericMatch[0]) : 1;
+            const numericPart = numericMatch ? (parseFloat(numericMatch[0]) || 0) : 1;
             const textPart = food.quantity.replace(/^\d+(\.\d+)?\s*/, '') || 'serving';
             
             return {
@@ -190,7 +192,7 @@ export default function AddDiet() {
         isActive: true
       };
 
-      console.log('Saving diet plan:', dietPlanData);
+      Logger.log('Saving diet plan:', dietPlanData);
 
       // Check if this specific meal plan already exists for this user
       const existingPlansResponse = await ApiService.getUserDietPlans(validUserId);
@@ -207,12 +209,12 @@ export default function AddDiet() {
 
       if (existingPlan) {
         // Update existing diet plan
-        console.log(`Updating existing ${selectedMealPlan} with ID: ${existingPlan._id}`);
+        Logger.log(`Updating existing ${selectedMealPlan} with ID: ${existingPlan._id}`);
         response = await ApiService.updateDietPlan(existingPlan._id, dietPlanData);
         actionMessage = `${selectedMealPlan} updated successfully!`;
       } else {
         // Create new diet plan
-        console.log(`Creating new ${selectedMealPlan}`);
+        Logger.log(`Creating new ${selectedMealPlan}`);
         response = await ApiService.createDietPlan(dietPlanData);
         actionMessage = `${selectedMealPlan} created successfully!`;
       }
@@ -233,7 +235,7 @@ export default function AddDiet() {
       }
 
     } catch (error) {
-      console.error('Save diet plan error:', error);
+      Logger.error('Save diet plan error:', error);
       Alert.alert("Error", "Failed to save diet plan. Please try again.");
     } finally {
       setLoading(false);
@@ -376,7 +378,7 @@ export default function AddDiet() {
             <ScrollView style={{ marginTop: 15 }}>
               {loadingFoods ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#d5ff5f" />
+                  <LoadingGif size={24} />
                   <Text style={{ color: '#fff', marginTop: 10 }}>Loading foods...</Text>
                 </View>
               ) : (
@@ -465,7 +467,7 @@ export default function AddDiet() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <LoadingGif size={24} />
           ) : (
             <Text style={styles.nextBtnText}>
               {currentStep === totalSteps ? "Confirm" : "Next"}

@@ -1,5 +1,5 @@
 import {
-    Poppins_400Regular,
+Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     useFonts,
@@ -8,7 +8,6 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
     Modal,
     Platform,
     ScrollView,
@@ -19,7 +18,10 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Logger from '../utils/logger';
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 export default function AddSchedule() {
   const router = useRouter();
@@ -84,7 +86,7 @@ export default function AddSchedule() {
         ]);
       }
     } catch (err) {
-      console.error('Load exercises error:', err);
+      Logger.error('Load exercises error:', err);
       setExerciseError('Failed to load exercises');
       // Fallback to mock data if API fails
       setExerciseOptions([
@@ -127,13 +129,13 @@ export default function AddSchedule() {
         description: `Workout for Day ${day} with ${exercises.length} exercises`,
         userId: userId,
         day: getDayName(day),
-        dayNumber: parseInt(day), // Use the actual day number entered by user
+        dayNumber: parseInt(day) || 1, // Use the actual day number entered by user
         exercises: exercises.map(ex => ({
           exercise: ex.exerciseId, // Exercise ID - backend will fetch the name automatically
-          sets: parseInt(ex.sets),
-          reps: parseInt(ex.reps),
+          sets: parseInt(ex.sets) || 0,
+          reps: parseInt(ex.reps) || 0,
           weight: ex.weight ? parseFloat(ex.weight) : 0,
-          restTime: ex.rest ? parseInt(ex.rest) : 60
+          restTime: ex.rest ? (parseInt(ex.rest) || 60) : 60
         })),
         totalDuration: parseInt(duration) || 0,
         workoutType: workoutType || 'Mixed',
@@ -141,19 +143,19 @@ export default function AddSchedule() {
         difficulty: 'Beginner' // Default difficulty
       };
 
-      console.log('Saving workout schedule:', workoutData);
+      Logger.log('Saving workout schedule:', workoutData);
 
       const response = await ApiService.createWorkoutSchedule(workoutData);
       
       if (response.success) {
-        console.log('Workout schedule saved successfully');
+        Logger.log('Workout schedule saved successfully');
         return true;
       } else {
         setSaveError('Failed to save workout schedule');
         return false;
       }
     } catch (error) {
-      console.error('Save workout schedule error:', error);
+      Logger.error('Save workout schedule error:', error);
       setSaveError('Failed to save workout schedule');
       return false;
     } finally {
@@ -164,7 +166,7 @@ export default function AddSchedule() {
   // Helper function to convert day number to day name
   const getDayName = (dayNumber) => {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const dayIndex = (parseInt(dayNumber) - 1) % 7;
+    const dayIndex = ((parseInt(dayNumber) || 1) - 1) % 7;
     return days[dayIndex] || 'Monday';
   };
 
@@ -302,7 +304,7 @@ export default function AddSchedule() {
 
             {loadingExercises ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#d5ff5f" />
+                <LoadingGif size={100} />
                 <Text style={styles.loadingText}>Loading exercises...</Text>
               </View>
             ) : exerciseError ? (
@@ -482,8 +484,9 @@ export default function AddSchedule() {
 
       {/* Form */}
       <ScrollView
-        contentContainerStyle={{ padding: 20 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={true}
       >
         {renderStep()}
       </ScrollView>

@@ -1,6 +1,10 @@
 import { useRouter, useSegments } from 'expo-router';
+// @ts-ignore
 import React, { createContext, useContext, useEffect, useState } from 'react';
+// @ts-ignore
 import ApiService from '../services/api';
+import Logger from '../utils/logger';
+
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -29,27 +33,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      
+
       // Load token from secure storage
       await ApiService.loadToken();
-      
+
       if (ApiService.token) {
         // Verify token is still valid by making a test request
         try {
           await ApiService.getProfile();
           setIsAuthenticated(true);
-          console.log('✅ Token is valid, user authenticated');
+          Logger.success('Token is valid, user authenticated');
         } catch (error) {
-          console.log('❌ Token invalid, removing stored token');
+          Logger.log('❌ Token invalid, removing stored token');
           await ApiService.removeToken();
           setIsAuthenticated(false);
         }
       } else {
         setIsAuthenticated(false);
-        console.log('ℹ️ No stored token found');
+        Logger.info('No stored token found');
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      Logger.error('Auth check error:', error);
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
@@ -59,17 +63,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (password: string, email = 'admin@gmail.com'): Promise<boolean> => {
     try {
       const response = await ApiService.login(password, email);
-      
+
       if (response.success && response.token) {
         setIsAuthenticated(true);
-        console.log('✅ Login successful');
+        Logger.success('Login successful');
         return true;
       } else {
-        console.log('❌ Login failed:', response.error);
+        Logger.log('❌ Login failed:', response.error);
         return false;
       }
     } catch (error) {
-      console.error('Login error:', error);
+      Logger.error('Login error:', error);
       return false;
     }
   };
@@ -78,9 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await ApiService.logout();
       setIsAuthenticated(false);
-      console.log('✅ Logout successful');
+      Logger.success('Logout successful');
     } catch (error) {
-      console.error('Logout error:', error);
+      Logger.error('Logout error:', error);
       // Still clear local state even if API call fails
       setIsAuthenticated(false);
     }
@@ -90,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inProtectedGroup = segments[0] === '(protected)';
+    const inProtectedGroup = (segments as string[])[0] === '(protected)';
+    const onSigninPage = (segments as string[])[0] === 'signin' || (segments as string[]).includes('signin');
 
     if (isAuthenticated) {
       // User is authenticated

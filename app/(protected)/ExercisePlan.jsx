@@ -1,5 +1,5 @@
 import {
-    Poppins_400Regular,
+Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     useFonts,
@@ -18,14 +18,17 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 export default function ExercisePlan() {
     const router = useRouter();
     const { userId } = useLocalSearchParams();
 
-    console.log('ExercisePlan component loaded with userId:', userId);
+    Logger.log('ExercisePlan component loaded with userId:', userId);
 
     // State for workout schedules
     const [schedules, setSchedules] = useState([]);
@@ -57,7 +60,7 @@ export default function ExercisePlan() {
         try {
             setLoading(true);
             setError(null);
-            console.log('Loading workout schedules for userId:', userId);
+            Logger.log('Loading workout schedules for userId:', userId);
 
             const response = await ApiService.getUserWorkoutSchedules(userId, {
                 limit: 50,
@@ -80,7 +83,7 @@ export default function ExercisePlan() {
                 }));
 
                 setSchedules(transformedSchedules);
-                console.log('Loaded workout schedules:', transformedSchedules.length);
+                Logger.log('Loaded workout schedules:', transformedSchedules.length);
             } else {
                 setError('Failed to load workout schedules');
                 // Fallback to mock data
@@ -89,7 +92,7 @@ export default function ExercisePlan() {
                 ]);
             }
         } catch (err) {
-            console.error('Load workout schedules error:', err);
+            Logger.error('Load workout schedules error:', err);
             setError('Failed to load workout schedules');
             // Fallback to mock data
             setSchedules([
@@ -101,11 +104,11 @@ export default function ExercisePlan() {
     };
 
     if (!fontsLoaded) {
-        console.log('Fonts not loaded yet');
+        Logger.log('Fonts not loaded yet');
         return null;
     }
 
-    console.log('ExercisePlan rendering with fonts loaded');
+    Logger.log('ExercisePlan rendering with fonts loaded');
 
     // Swipeable Workout Card Component using PanResponder
     const SwipeableWorkoutCard = ({ item, onPress, onDelete }) => {
@@ -506,7 +509,7 @@ export default function ExercisePlan() {
     // Delete workout function
     const deleteWorkout = async (workoutId, workoutName) => {
         try {
-            console.log('Deleting workout:', workoutId);
+            Logger.log('Deleting workout:', workoutId);
             const response = await ApiService.deleteWorkoutSchedule(workoutId);
 
             if (response.success) {
@@ -519,7 +522,7 @@ export default function ExercisePlan() {
                 Alert.alert('Error', 'Failed to delete workout schedule');
             }
         } catch (error) {
-            console.error('Delete workout error:', error);
+            Logger.error('Delete workout error:', error);
             Alert.alert('Error', 'Failed to delete workout schedule');
         }
     };
@@ -546,7 +549,7 @@ export default function ExercisePlan() {
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#d5ff5f" />
+                <LoadingGif size={80} />
                 <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
                     Loading workout schedules...
                 </Text>

@@ -1,5 +1,6 @@
 import {
-    Poppins_400Regular,
+  Alert,
+Poppins_400Regular,
     Poppins_500Medium,
     useFonts,
 } from "@expo-google-fonts/poppins";
@@ -15,8 +16,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
 import ApiService from "../services/api";
+import LoadingGif from '../components/LoadingGif';
+
 
 export default function DietPlan() {
     const [selectedMeal, setSelectedMeal] = useState(null);
@@ -30,8 +34,8 @@ export default function DietPlan() {
     const effectiveUserId = userId || "68e8fd08e8d1859ebd9edd05";
     
     // Debug logging to verify userId is being passed correctly
-    console.log('DietPlan - Received userId:', userId);
-    console.log('DietPlan - Using effectiveUserId:', effectiveUserId);
+    Logger.log('DietPlan - Received userId:', userId);
+    Logger.log('DietPlan - Using effectiveUserId:', effectiveUserId);
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -42,10 +46,10 @@ export default function DietPlan() {
     const loadDietPlans = useCallback(async () => {
         try {
             setLoading(true);
-            console.log('Loading diet plans for userId:', effectiveUserId);
+            Logger.log('Loading diet plans for userId:', effectiveUserId);
 
             const response = await ApiService.getUserDietPlans(effectiveUserId);
-            console.log('API response:', response);
+            Logger.log('API response:', response);
 
             if (response.success && response.dietPlans && response.dietPlans.length > 0) {
                 // Transform API data to match the UI format
@@ -75,13 +79,13 @@ export default function DietPlan() {
                 });
 
                 setMeals(transformedMeals);
-                console.log('Loaded meals:', transformedMeals.length);
+                Logger.log('Loaded meals:', transformedMeals.length);
             } else {
                 // No diet plans found - show empty state
                 setMeals([]);
             }
         } catch (err) {
-            console.error('Load diet plans error:', err);
+            Logger.error('Load diet plans error:', err);
             // Show empty state on error
             setMeals([]);
         } finally {
@@ -108,7 +112,7 @@ export default function DietPlan() {
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color="#d5ff5f" />
+                <LoadingGif size={80} />
                 <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
                     Loading diet plans...
                 </Text>

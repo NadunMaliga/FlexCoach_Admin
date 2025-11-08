@@ -1,16 +1,33 @@
 
 import * as SecureStore from 'expo-secure-store';
+import { 
+  API_URL, 
+  API_BASE, 
+  API_TIMEOUT, 
+  ENABLE_LOGGING,
+  logConfig 
+} from '../config/environment';
+import Logger from '../utils/logger';
+import { validateUserId, validateId, validateName, validateEmail, sanitizeString } from '../utils/validators';
+import { handleApiError, secureLog } from '../utils/errorHandling';
 
-// Simple environment configuration
-const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+// Log configuration on service initialization
+logConfig();
 
-const BASE_URL = isDev
-  ? 'http://10.61.200.234:3001'  // Development
-  : 'https://your-production-api.com'; // Production - UPDATE THIS
+// For backward compatibility
+const BASE_URL = API_URL;
 
-const API_BASE = `${BASE_URL}/api/admin`;
-const API_TIMEOUT = isDev ? 10000 : 30000;
-const ENABLE_LOGGING = isDev;
+/**
+ * API Service for FlexCoach Admin
+ * 
+ * Error Handling Strategy:
+ * - All async methods rely on axios interceptors for error handling
+ * - Interceptors catch and process errors globally
+ * - Individual try-catch blocks are not needed in each method
+ * - Errors are logged and transformed into user-friendly messages
+ * 
+ * See axios configuration for interceptor implementation
+ */
 
 class ApiService {
   constructor() {
@@ -22,7 +39,7 @@ class ApiService {
     try {
       this.token = await SecureStore.getItemAsync('adminToken');
     } catch (error) {
-      console.error('Error loading token:', error);
+      Logger.error('Error loading token:', error);
     }
   }
 
@@ -31,7 +48,7 @@ class ApiService {
     try {
       await SecureStore.setItemAsync('adminToken', token);
     } catch (error) {
-      console.error('Error saving token:', error);
+      Logger.error('Error saving token:', error);
     }
   }
 
@@ -40,7 +57,7 @@ class ApiService {
     try {
       await SecureStore.deleteItemAsync('adminToken');
     } catch (error) {
-      console.error('Error removing token:', error);
+      Logger.error('Error removing token:', error);
     }
   }
 
@@ -59,11 +76,11 @@ class ApiService {
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
       if (ENABLE_LOGGING) {
-        console.log(`🔑 Adding auth header with token: ${this.token.substring(0, 20)}...`);
+        Logger.debug(`Adding auth header with token: ${this.token.substring(0, 20)}...`);
       }
     } else {
       if (ENABLE_LOGGING) {
-        console.log(`⚠️ No token available for request`);
+        Logger.log(`⚠️ No token available for request`);
       }
     }
 
@@ -80,8 +97,8 @@ class ApiService {
 
     try {
       if (ENABLE_LOGGING) {
-        console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
-        console.log(`🔑 Token present: ${!!this.token}`);
+        Logger.info(`API Request: ${options.method || 'GET'} ${url}`);
+        Logger.debug(`Token present: ${!!this.token}`);
       }
 
       const response = await fetch(url, requestConfig);
@@ -92,14 +109,14 @@ class ApiService {
       }
 
       if (ENABLE_LOGGING) {
-        console.log(`✅ API Success: ${endpoint}`);
+        Logger.success(`API Success: ${endpoint}`);
       }
 
       return data;
     } catch (error) {
       if (ENABLE_LOGGING) {
-        console.error(`❌ API Failed: ${endpoint}`, error);
-        console.error(`Full URL: ${url}`);
+        Logger.failure(`API Failed: ${endpoint}`, error);
+        Logger.error(`Full URL: ${url}`);
       }
       throw error;
     }
@@ -110,10 +127,10 @@ class ApiService {
     try {
       const response = await fetch(`${BASE_URL}/health`);
       const data = await response.json();
-      console.log('Backend connection test:', data);
+      Logger.log('Backend connection test:', data);
       return response.ok;
     } catch (error) {
-      console.error('Backend connection failed:', error);
+      Logger.error('Backend connection failed:', error);
       return false;
     }
   }
@@ -136,7 +153,7 @@ class ApiService {
     try {
       await this.request('/logout', { method: 'POST' });
     } catch (error) {
-      console.error('Logout error:', error);
+      Logger.error('Logout error:', error);
     } finally {
       await this.removeToken();
     }
@@ -153,22 +170,27 @@ class ApiService {
   }
 
   async getUserById(userId) {
-    return this.request(`/users/${userId}`);
+    const validatedId = validateUserId(userId);
+    return this.request(`/users/${validatedId}`);
   }
 
   async approveUser(userId) {
-    return this.request(`/users/${userId}/approve`, { method: 'POST' });
+    const validatedId = validateUserId(userId);
+    return this.request(`/users/${validatedId}/approve`, { method: 'POST' });
   }
 
   async rejectUser(userId, reason) {
-    return this.request(`/users/${userId}/reject`, {
+    const validatedId = validateUserId(userId);
+    const sanitizedReason = sanitizeString(reason);
+    return this.request(`/users/${validatedId}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason: sanitizedReason }),
     });
   }
 
   async updateUserStatus(userId, isActive) {
-    return this.request(`/users/${userId}/status`, {
+    const validatedId = validateUserId(userId);
+    return this.request(`/users/${validatedId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ isActive }),
     });
@@ -194,25 +216,36 @@ class ApiService {
   }
 
   async getExerciseById(id) {
-    return this.request(`/exercises/${id}`);
+    const validatedId = validateId(id, 'Exercise ID');
+    return this.request(`/exercises/${validatedId}`);
   }
 
   async createExercise(exerciseData) {
+    const validatedData = { ...exerciseData };
+    if (validatedData.name) {
+      validatedData.name = validateName(validatedData.name);
+    }
     return this.request('/exercises', {
       method: 'POST',
-      body: JSON.stringify(exerciseData),
+      body: JSON.stringify(validatedData),
     });
   }
 
   async updateExercise(id, exerciseData) {
-    return this.request(`/exercises/${id}`, {
+    const validatedId = validateId(id, 'Exercise ID');
+    const validatedData = { ...exerciseData };
+    if (validatedData.name) {
+      validatedData.name = validateName(validatedData.name);
+    }
+    return this.request(`/exercises/${validatedId}`, {
       method: 'PUT',
-      body: JSON.stringify(exerciseData),
+      body: JSON.stringify(validatedData),
     });
   }
 
   async deleteExercise(id) {
-    return this.request(`/exercises/${id}`, { method: 'DELETE' });
+    const validatedId = validateId(id, 'Exercise ID');
+    return this.request(`/exercises/${validatedId}`, { method: 'DELETE' });
   }
 
   // Foods
@@ -222,25 +255,36 @@ class ApiService {
   }
 
   async getFoodById(id) {
-    return this.request(`/foods/${id}`);
+    const validatedId = validateId(id, 'Food ID');
+    return this.request(`/foods/${validatedId}`);
   }
 
   async createFood(foodData) {
+    const validatedData = { ...foodData };
+    if (validatedData.name) {
+      validatedData.name = validateName(validatedData.name);
+    }
     return this.request('/foods', {
       method: 'POST',
-      body: JSON.stringify(foodData),
+      body: JSON.stringify(validatedData),
     });
   }
 
   async updateFood(id, foodData) {
-    return this.request(`/foods/${id}`, {
+    const validatedId = validateId(id, 'Food ID');
+    const validatedData = { ...foodData };
+    if (validatedData.name) {
+      validatedData.name = validateName(validatedData.name);
+    }
+    return this.request(`/foods/${validatedId}`, {
       method: 'PUT',
-      body: JSON.stringify(foodData),
+      body: JSON.stringify(validatedData),
     });
   }
 
   async deleteFood(id) {
-    return this.request(`/foods/${id}`, { method: 'DELETE' });
+    const validatedId = validateId(id, 'Food ID');
+    return this.request(`/foods/${validatedId}`, { method: 'DELETE' });
   }
 
   // Diet Plans
@@ -250,8 +294,9 @@ class ApiService {
   }
 
   async getUserDietPlans(userId) {
+    const validatedId = validateUserId(userId);
     // Use non-admin route for fetching user diet plans
-    const response = await fetch(`${BASE_URL}/api/diet-plans/user/${userId}`, {
+    const response = await fetch(`${BASE_URL}/api/diet-plans/user/${validatedId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -267,7 +312,8 @@ class ApiService {
   }
 
   async getDietPlanById(id) {
-    return this.request(`/diet-plans/${id}`);
+    const validatedId = validateId(id, 'Diet Plan ID');
+    return this.request(`/diet-plans/${validatedId}`);
   }
 
   async createDietPlan(dietPlanData) {
@@ -289,7 +335,7 @@ class ApiService {
   }
 
   async updateDietPlan(id, dietPlanData) {
-    console.log('Updating diet plan:', id, dietPlanData);
+    Logger.log('Updating diet plan:', id, dietPlanData);
 
     // Use non-admin route for diet plan updates
     const response = await fetch(`${BASE_URL}/api/diet-plans/${id}`, {
@@ -305,7 +351,7 @@ class ApiService {
   }
 
   async deleteDietPlan(id) {
-    console.log('Deleting diet plan:', id);
+    Logger.log('Deleting diet plan:', id);
 
     // Use non-admin route for diet plan deletion
     const response = await fetch(`${BASE_URL}/api/diet-plans/${id}`, {
@@ -389,20 +435,24 @@ class ApiService {
   }
 
   async getUserWorkoutSchedules(userId, params = {}) {
+    const validatedId = validateUserId(userId);
     const queryString = new URLSearchParams(params).toString();
-    return this.request(`/workout-schedules/user/${userId}${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/workout-schedules/user/${validatedId}${queryString ? `?${queryString}` : ''}`);
   }
 
   async getWorkoutScheduleById(id) {
-    return this.request(`/workout-schedules/${id}`);
+    const validatedId = validateId(id, 'Workout Schedule ID');
+    return this.request(`/workout-schedules/${validatedId}`);
   }
 
   async getWorkoutScheduleDetails(id) {
-    return this.request(`/workout-schedules/${id}/details`);
+    const validatedId = validateId(id, 'Workout Schedule ID');
+    return this.request(`/workout-schedules/${validatedId}/details`);
   }
 
   async getLatestWorkoutSchedule(userId) {
-    return this.request(`/workout-schedules/user/${userId}/latest`);
+    const validatedId = validateUserId(userId);
+    return this.request(`/workout-schedules/user/${validatedId}/latest`);
   }
 
   async createWorkoutSchedule(scheduleData) {
@@ -413,18 +463,21 @@ class ApiService {
   }
 
   async updateWorkoutSchedule(id, scheduleData) {
-    return this.request(`/workout-schedules/${id}`, {
+    const validatedId = validateId(id, 'Workout Schedule ID');
+    return this.request(`/workout-schedules/${validatedId}`, {
       method: 'PUT',
       body: JSON.stringify(scheduleData),
     });
   }
 
   async markWorkoutCompleted(id) {
-    return this.request(`/workout-schedules/${id}/complete`, { method: 'PATCH' });
+    const validatedId = validateId(id, 'Workout Schedule ID');
+    return this.request(`/workout-schedules/${validatedId}/complete`, { method: 'PATCH' });
   }
 
   async deleteWorkoutSchedule(id) {
-    return this.request(`/workout-schedules/${id}`, { method: 'DELETE' });
+    const validatedId = validateId(id, 'Workout Schedule ID');
+    return this.request(`/workout-schedules/${validatedId}`, { method: 'DELETE' });
   }
 
   // Chats
@@ -434,23 +487,27 @@ class ApiService {
   }
 
   async getUserChat(userId, params = {}) {
+    const validatedId = validateUserId(userId);
     const queryString = new URLSearchParams(params).toString();
-    return this.request(`/chats/user/${userId}${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/chats/user/${validatedId}${queryString ? `?${queryString}` : ''}`);
   }
 
   async sendMessage(userId, messageData) {
-    return this.request(`/chats/user/${userId}/message`, {
+    const validatedId = validateUserId(userId);
+    return this.request(`/chats/user/${validatedId}/message`, {
       method: 'POST',
       body: JSON.stringify(messageData),
     });
   }
 
   async markMessagesAsRead(userId) {
-    return this.request(`/chats/user/${userId}/read`, { method: 'PATCH' });
+    const validatedId = validateUserId(userId);
+    return this.request(`/chats/user/${validatedId}/read`, { method: 'PATCH' });
   }
 
   async deleteMessage(messageId) {
-    return this.request(`/chats/message/${messageId}`, { method: 'DELETE' });
+    const validatedId = validateId(messageId, 'Message ID');
+    return this.request(`/chats/message/${validatedId}`, { method: 'DELETE' });
   }
 
   async getChatStats() {

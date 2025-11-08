@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
 import { AuthProvider } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <Stack screenOptions={{ 
+    <ErrorBoundary>
+      <AuthProvider>
+        <Stack screenOptions={{ 
         headerShown: true,
         headerStyle: { backgroundColor: '#000' },
         headerTintColor: '#fff',
@@ -29,19 +31,6 @@ export default function RootLayout() {
           }} 
         />
         <Stack.Screen 
-          name="Chat" 
-          options={{ 
-            title: 'Chat'
-          }} 
-        />
-
-        <Stack.Screen 
-          name="ClientBodyImage" 
-          options={{ 
-            title: 'Body Images'
-          }} 
-        />
-        <Stack.Screen 
           name="Alert" 
           options={{ 
             title: 'Alerts'
@@ -59,6 +48,7 @@ export default function RootLayout() {
           options={{ headerShown: false }} 
         />
       </Stack>
-    </AuthProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
