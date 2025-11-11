@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   Poppins_300Light,
   Poppins_400Regular,

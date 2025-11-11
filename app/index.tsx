@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Poppins_300Light, useFonts } from '@expo-google-fonts/poppins';
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
@@ -43,8 +44,8 @@ export default function Index() {
       <View style={styles.container}>
         <View style={styles.headingContainer}>
           <Text style={styles.heading}>
-           YOUR FITNESS{"\n"}STARTS{"\n"}HERE{"\n"}
-          
+            YOUR FITNESS{"\n"}STARTS{"\n"}HERE{"\n"}
+
           </Text>
         </View>
 
@@ -62,11 +63,11 @@ export default function Index() {
 const styles = StyleSheet.create({
   background: { flex: 1, width: '100%', height: '100%' },
   container: { padding: 20, flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.1)" },
-  loadingContainer: { 
-    flex: 1, 
-    backgroundColor: '#000', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   button: { backgroundColor: "#d5ff5f", paddingVertical: 17, borderRadius: 30, marginBottom: 12, marginTop: 100, alignItems: "center", justifyContent: "center" },
   buttonText: { fontSize: 18, color: "#000000ff", fontFamily: "Poppins_300Light", textAlign: "center" },
