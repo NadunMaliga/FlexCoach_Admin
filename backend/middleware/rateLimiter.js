@@ -78,8 +78,12 @@ const createRateLimiter = (type) => {
 
   return rateLimit({
     ...config,
-    // Use default key generator (IP-based) for compatibility
-    // Custom user tracking is handled in the handler function
+    // Custom key generator to handle IPv6 and proxy headers
+    keyGenerator: (req) => {
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      // Normalize IPv6 addresses to avoid rate limiting errors
+      return ip.replace(/^::ffff:/, '');
+    },
     
     // Custom handler for rate limit exceeded
     handler: async (req, res) => {

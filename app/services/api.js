@@ -105,6 +105,12 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
+      // Check for authentication errors
+      if (response.status === 401) {
+        Logger.log('Authentication failed - Token may be expired');
+        await this.removeToken();
+        throw new Error('Session expired. Please sign in again.');
+      }
         throw new Error(data.error || `HTTP error! status: ${response.status}`);
       }
 
@@ -152,10 +158,13 @@ class ApiService {
   async logout() {
     try {
       await this.request('/logout', { method: 'POST' });
+      Logger.success('✅ Logout successful');
     } catch (error) {
-      Logger.error('Logout error:', error);
+      // Ignore logout errors - token will be removed anyway
+      Logger.log('Logout request failed (token will be removed anyway):', error.message);
     } finally {
       await this.removeToken();
+      Logger.success('✅ Token removed successfully');
     }
   }
 
@@ -691,6 +700,42 @@ class ApiService {
     }
 
     return await response.json();
+  }
+
+  async uploadAdminProfilePhoto(formData) {
+    try {
+      const token = await SecureStore.getItemAsync('adminToken');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      const response = await fetch(`${BASE_URL}/api/admin/profile-photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type - let FormData set it with boundary
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      Logger.error('Upload admin profile photo error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to upload profile photo'
+      };
+    }
+  }
+
+  getBaseUrl() {
+    return BASE_URL;
   }
 }
 

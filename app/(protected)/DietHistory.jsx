@@ -4,9 +4,9 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import Logger from '../utils/logger';
-import LoadingGif from '../components/LoadingGif';
+import ListSkeleton from '../components/ListSkeleton';
 
 
 
@@ -135,11 +135,8 @@ export default function DietHistory() {
 
     if (loading) {
         return (
-            <View style={[{ flex: 1, backgroundColor: "#000" }, { justifyContent: 'center', alignItems: 'center' }]}>
-                <LoadingGif size={100} />
-                <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
-                    Loading diet history...
-                </Text>
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+                <ListSkeleton count={6} />
             </View>
         );
     }

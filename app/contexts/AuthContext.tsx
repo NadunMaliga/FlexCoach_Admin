@@ -1,9 +1,43 @@
 import { useRouter, useSegments } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 // @ts-ignore
 import React, { createContext, useContext, useEffect, useState } from 'react';
 // @ts-ignore
 import ApiService from '../services/api';
 import Logger from '../utils/logger';
+
+// Token expiration utilities
+const TOKEN_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_REFRESH_THRESHOLD = 2 * 60 * 60 * 1000; // 2 hours before expiration
+
+const isTokenExpired = (tokenTimestamp: number): boolean => {
+  const now = Date.now();
+  return now - tokenTimestamp > TOKEN_EXPIRATION_TIME;
+};
+
+const shouldRefreshToken = (tokenTimestamp: number): boolean => {
+  const now = Date.now();
+  const timeUntilExpiration = TOKEN_EXPIRATION_TIME - (now - tokenTimestamp);
+  return timeUntilExpiration < TOKEN_REFRESH_THRESHOLD;
+};
+
+const saveTokenTimestamp = async (timestamp: number) => {
+  try {
+    await SecureStore.setItemAsync('tokenTimestamp', timestamp.toString());
+  } catch (error) {
+    Logger.error('Failed to save token timestamp:', error);
+  }
+};
+
+const getTokenTimestamp = async (): Promise<number | null> => {
+  try {
+    const timestamp = await SecureStore.getItemAsync('tokenTimestamp');
+    return timestamp ? parseInt(timestamp, 10) : null;
+  } catch (error) {
+    Logger.error('Failed to get token timestamp:', error);
+    return null;
+  }
+};
 
 
 interface AuthContextType {
@@ -38,6 +72,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await ApiService.loadToken();
 
       if (ApiService.token) {
+      // Check token expiration
+      const tokenTimestamp = await getTokenTimestamp();
+      
+      if (tokenTimestamp && isTokenExpired(tokenTimestamp)) {
+        Logger.log('Token expired, logging out');
+        await ApiService.removeToken();
+        await SecureStore.deleteItemAsync('tokenTimestamp');
+        setIsAuthenticated(false);
+        return;
+      }
+      
+      // Check if token should be refreshed
+      if (tokenTimestamp && shouldRefreshToken(tokenTimestamp)) {
+        Logger.log('Token nearing expiration, should refresh');
+        // TODO: Implement token refresh endpoint
+      }
         // Verify token is still valid by making a test request
         try {
           await ApiService.getProfile();
@@ -65,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await ApiService.login(password, email);
 
       if (response.success && response.token) {
+        await saveTokenTimestamp(Date.now());
         setIsAuthenticated(true);
         Logger.success('Login successful');
         return true;

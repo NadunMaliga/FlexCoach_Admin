@@ -8,6 +8,7 @@ const compression = require('compression');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const multer = require('multer');
 const { body, validationResult } = require('express-validator');
 const config = require('./config');
 
@@ -92,6 +93,9 @@ const {
 
 const app = express();
 
+// Configure trust proxy for Nginx reverse proxy
+app.set('trust proxy', 1);
+
 // Apply enhanced security middleware stack
 console.log('🔒 Applying enhanced security middleware...');
 
@@ -123,7 +127,7 @@ app.use((req, res, next) => {
   if (req.body) sanitizeObject(req.body);
   if (req.query) sanitizeObject(req.query);
   if (req.params) sanitizeObject(req.params);
-  
+
   next();
 });
 
@@ -139,6 +143,9 @@ app.use(securityMonitor);
 
 // Enhanced CORS configuration for admin mobile app
 app.use(corsMiddleware);
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // Enhanced compression middleware for mobile data optimization
 app.use(compression({
@@ -390,6 +397,67 @@ app.get('/health', (req, res) => {
 // Rate limit status endpoint for monitoring
 app.get('/api/admin/rate-limit-status', applyRateLimit('admin'), authenticateToken, requireAdmin, getRateLimitStatus);
 
+// Multer configuration for admin profile photo upload
+const adminProfileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/profile-pictures');
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `admin-${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${ext}`);
+  }
+});
+
+const adminProfileUpload = multer({
+  storage: adminProfileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'));
+    }
+  }
+});
+
+// Admin profile photo upload endpoint
+app.post('/api/admin/profile-photo', 
+  applyRateLimit('upload'),
+  authenticateToken,
+  requireAdmin,
+  adminProfileUpload.single('profilePhoto'),
+  asyncHandler(async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file uploaded'
+        });
+      }
+
+      const profilePhotoUrl = `/uploads/profile-pictures/${req.file.filename}`;
+
+      // Log the upload
+      console.log(`✅ Admin profile photo uploaded: ${profilePhotoUrl}`);
+
+      res.json({
+        success: true,
+        profilePhotoUrl,
+        message: 'Profile photo uploaded successfully'
+      });
+    } catch (error) {
+      console.error('❌ Admin profile photo upload error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to upload profile photo'
+      });
+    }
+  })
+);
+
 // Admin Authentication Routes
 
 // Secure admin login with environment variables
@@ -417,10 +485,10 @@ app.post('/api/admin/login', applyRateLimit('login'), validateAdminLogin, asyncH
     console.log('Comparing password...');
     console.log('Config ADMIN_EMAIL:', config.ADMIN_EMAIL);
     console.log('Config ADMIN_PASSWORD_HASH:', config.ADMIN_PASSWORD_HASH ? config.ADMIN_PASSWORD_HASH.substring(0, 20) + '...' : 'undefined');
-    
+
     const isValidPassword = await bcrypt.compare(password, config.ADMIN_PASSWORD_HASH);
     console.log('Password comparison result:', isValidPassword);
-    
+
     if (!isValidPassword) {
       throw new AuthenticationError('Invalid credentials', ERROR_CODES.INVALID_CREDENTIALS);
     }
@@ -606,9 +674,15 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, validateUserListQue
       query.gender = gender;
     }
 
-    // Active status filtering
+    // Active status filtering (supports both isActive and isApproved parameters)
     if (isActive !== undefined) {
-      query.isActive = isActive === 'true';
+      query.isApproved = isActive === 'true';
+    }
+
+    // Also support isApproved parameter directly
+    const { isApproved } = req.query;
+    if (isApproved !== undefined) {
+      query.isApproved = isApproved === 'true';
     }
 
     // Onboarding completion filtering
@@ -1023,7 +1097,7 @@ app.post('/api/admin/users/:userId/approve', applyRateLimit('sensitive'), authen
   }
 }));
 
-// Update user status (activate/deactivate)
+// Update user status (activate/deactivate) - Uses isApproved field
 app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authenticateToken, requireAdmin, validateUserId, validateAdminEndpoint, asyncHandler(async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1056,8 +1130,26 @@ app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authen
       });
     }
 
-    // Update user status
-    user.isActive = isActive;
+    // Update user approval status (isApproved controls active/inactive state)
+    const previousStatus = user.isApproved;
+    user.isApproved = isActive;
+    user.status = isActive ? 'approved' : 'rejected';
+
+    // Update approval metadata (timestamps only, not admin references)
+    if (isActive) {
+      user.approvedAt = new Date();
+      // Clear rejection fields
+      user.rejectedBy = undefined;
+      user.rejectedAt = undefined;
+      user.rejectedReason = undefined;
+    } else {
+      user.rejectedAt = new Date();
+      user.rejectedReason = 'Deactivated by admin';
+      // Clear approval fields
+      user.approvedBy = undefined;
+      user.approvedAt = undefined;
+    }
+
     user.updatedAt = new Date();
     await user.save();
 
@@ -1068,8 +1160,10 @@ app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authen
       resource: 'user',
       resourceId: userId,
       details: {
-        previousStatus: !isActive,
+        previousStatus: previousStatus,
         newStatus: isActive,
+        isApproved: user.isApproved,
+        status: user.status,
         userEmail: user.email,
         userName: `${user.firstName} ${user.lastName}`
       },
@@ -1086,7 +1180,8 @@ app.patch('/api/admin/users/:userId/status', applyRateLimit('sensitive'), authen
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        isActive: user.isActive,
+        isApproved: user.isApproved,
+        status: user.status,
         updatedAt: user.updatedAt
       }
     });
@@ -2266,7 +2361,7 @@ app.use('/api/user-profiles', userProfileRoutes);
 app.use('*', (req, res, next) => {
   const error = new NotFoundError(
     `Route ${req.method} ${req.originalUrl} not found`,
-    ErrorCodes.RESOURCE_NOT_FOUND
+    'RESOURCE_NOT_FOUND'
   );
   next(error);
 });

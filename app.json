@@ -5,17 +5,41 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "",
+    "scheme": "flexcoach",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      },
+      "jsEngine": "hermes"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
-      }
+      },
+      "package": "com.chenura.FlexCoach",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ],
+      "backgroundColor": "#000000",
+      "softwareKeyboardLayoutMode": "pan",
+      "userInterfaceStyle": "dark",
+      "splash": {
+        "backgroundColor": "#000000",
+        "resizeMode": "contain",
+        "image": "./assets/images/splash-icon.png"
+      },
+      "jsEngine": "hermes"
     },
     "web": {
       "bundler": "metro",
@@ -25,10 +49,24 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#d5ff5f",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9b64b033-eee8-4cca-a90a-763d0035f515"
+      }
     }
   }
 }

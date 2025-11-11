@@ -8,6 +8,7 @@ import Logger from './utils/logger';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,9 +17,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
 import { useAuth } from "./contexts/AuthContext";
+import HapticFeedback from './utils/haptics';
 
 export default function SignIn() {
   const router = useRouter();
@@ -49,20 +52,27 @@ export default function SignIn() {
   const onSignIn = async () => {
     const err = validate(password);
     setError(err);
-    if (err) return;
+    if (err) {
+      HapticFeedback.error(); // Error haptic for validation failure
+      return;
+    }
 
     try {
+      HapticFeedback.light(); // Light tap on button press
       setSubmitting(true);
 
       const success = await login(password);
 
       if (success) {
+        HapticFeedback.success(); // Success haptic on login
         // Navigation will be handled automatically by AuthContext
         Logger.log('Login successful, will auto-redirect to Dashboard');
       } else {
+        HapticFeedback.error(); // Error haptic for invalid password
         setError("Invalid password");
       }
     } catch (err) {
+      HapticFeedback.error(); // Error haptic for login failure
       Logger.error("Login error:", err);
       setError("Invalid password");
     } finally {
@@ -72,8 +82,11 @@ export default function SignIn() {
 
   const isDisabled = submitting || !password || !!error;
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={styles.container}>
+      <View style={{ height: statusBarHeight }} />
       <Text style={styles.header}>Verify You</Text>
       <Text style={styles.secondheader}>
         Enter the password given to you{"\n"} by the admin.
@@ -122,9 +135,11 @@ export default function SignIn() {
           onPress={onSignIn}
           disabled={isDisabled}
         >
-          <Text style={styles.nextButtonText}>
-            {submitting ? "Next..." : "Next"}
-          </Text>
+          {submitting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.nextButtonText}>Next</Text>
+          )}
         </TouchableOpacity>
 
         {/* Go to Sign Up (optional) */}
@@ -182,6 +197,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 25,
     paddingVertical: 20,
     borderTopWidth: 1,

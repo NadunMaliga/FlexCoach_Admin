@@ -1,34 +1,39 @@
 import {
-Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Logger from '../utils/logger';
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 export default function AddSchedule() {
   const router = useRouter();
-  const { userId } = useLocalSearchParams();
+  const { userId, scheduleId, mode } = useLocalSearchParams();
+  const isEditMode = mode === 'edit' && !!scheduleId;
 
   const totalSteps = 3;
   const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(isEditMode);
 
   const [workoutName, setWorkoutName] = useState("");
   const [day, setDay] = useState("");
@@ -45,11 +50,11 @@ export default function AddSchedule() {
   const [duration, setDuration] = useState("");
   const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
   const [workoutTypeModalVisible, setWorkoutTypeModalVisible] = useState(false);
-  
+
   // Saving state
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  
+
   // Exercise data from API
   const [exerciseOptions, setExerciseOptions] = useState([]);
   const [loadingExercises, setLoadingExercises] = useState(false);
@@ -64,13 +69,92 @@ export default function AddSchedule() {
   // Load exercises from API
   useEffect(() => {
     loadExercises();
+
+    // Load existing schedule data if in edit mode
+    if (isEditMode) {
+      loadScheduleForEdit();
+    }
   }, []);
+
+  // Load existing schedule data for editing
+  const loadScheduleForEdit = async () => {
+    if (!scheduleId) return;
+
+    try {
+      setLoading(true);
+      Logger.log('Loading schedule for edit, scheduleId:', scheduleId);
+
+      const response = await OfflineApiService.getUserWorkoutSchedules(userId);
+
+      Logger.log('API Response:', response);
+
+      if (response.success) {
+        // Check both possible response structures
+        const schedulesList = response.schedules || response.workoutSchedules || [];
+        Logger.log('Schedules list:', schedulesList);
+        
+        const scheduleToEdit = schedulesList.find(s => s._id === scheduleId);
+
+        if (scheduleToEdit) {
+          Logger.log('Found schedule to edit:', scheduleToEdit);
+
+          // Extract day number from day string (e.g., "Day 1" -> "1")
+          let dayNumber = '';
+          if (scheduleToEdit.day) {
+            const dayMatch = scheduleToEdit.day.match(/\d+/);
+            dayNumber = dayMatch ? dayMatch[0] : scheduleToEdit.dayNumber?.toString() || '';
+          } else if (scheduleToEdit.dayNumber) {
+            dayNumber = scheduleToEdit.dayNumber.toString();
+          }
+
+          // Set basic info
+          setWorkoutName(scheduleToEdit.name || '');
+          setDay(dayNumber);
+          setWorkoutType(scheduleToEdit.workoutType || '');
+          setDuration(scheduleToEdit.totalDuration?.toString() || scheduleToEdit.estimatedDuration?.toString() || scheduleToEdit.duration?.toString() || '');
+
+          // Set exercises
+          if (scheduleToEdit.exercises && scheduleToEdit.exercises.length > 0) {
+            const formattedExercises = scheduleToEdit.exercises.map(ex => {
+              // Handle different exercise data structures
+              const exerciseData = ex.exercise || ex;
+              return {
+                name: exerciseData.name || ex.exerciseName || '',
+                exerciseId: exerciseData._id || ex.exerciseId || ex._id || '',
+                sets: ex.sets?.toString() || '',
+                reps: ex.reps?.toString() || '',
+                weight: ex.weight?.toString() || '',
+                rest: (ex.restTime || ex.rest)?.toString() || ''
+              };
+            });
+            setExercises(formattedExercises);
+            Logger.log('Loaded exercises for editing:', formattedExercises);
+          }
+        } else {
+          Logger.error('Schedule not found with ID:', scheduleId);
+          Logger.error('Available schedule IDs:', schedulesList.map(s => s._id));
+          showAlert('Error', 'Schedule not found');
+          router.back();
+        }
+      } else {
+        Logger.error('API response not successful:', response);
+        showAlert('Error', 'Failed to load schedule');
+        router.back();
+      }
+    } catch (error) {
+      Logger.error('Error loading schedule for edit:', error);
+      showAlert('Error', 'Failed to load schedule');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadExercises = async () => {
     try {
       setLoadingExercises(true);
       setExerciseError(null);
-      const response = await ApiService.getExercises({ limit: 100 });
+      const response = await OfflineApiService.getExercises({ limit: 100 });
       if (response.success) {
         setExerciseOptions(response.exercises || []);
       } else {
@@ -103,6 +187,18 @@ export default function AddSchedule() {
   };
 
   if (!fontsLoaded) return null;
+
+  // Show loading screen while fetching schedule data in edit mode
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <LoadingGif size={100} />
+        <Text style={{ color: '#999', marginTop: 20, fontFamily: 'Poppins_400Regular' }}>
+          Loading schedule...
+        </Text>
+      </View>
+    );
+  }
 
   const addExercise = () => {
     if (!tempExercise.name || !tempExercise.exerciseId || !tempExercise.sets || !tempExercise.reps) {
@@ -145,8 +241,16 @@ export default function AddSchedule() {
 
       Logger.log('Saving workout schedule:', workoutData);
 
-      const response = await ApiService.createWorkoutSchedule(workoutData);
-      
+      let response;
+      if (isEditMode && scheduleId) {
+        // Update existing schedule
+        Logger.log('Updating schedule with ID:', scheduleId);
+        response = await OfflineApiService.updateWorkoutSchedule(scheduleId, workoutData);
+      } else {
+        // Create new schedule
+        response = await OfflineApiService.createWorkoutSchedule(workoutData);
+      }
+
       if (response.success) {
         Logger.log('Workout schedule saved successfully');
         return true;
@@ -201,7 +305,7 @@ export default function AddSchedule() {
   const renderStep1 = () => (
     <>
       <Text style={styles.stepTitle}>Step 1: Workout Details</Text>
-      
+
       <TextInput
         style={styles.input}
         placeholder="Workout Name (e.g., Upper Body Strength)"
@@ -305,7 +409,6 @@ export default function AddSchedule() {
             {loadingExercises ? (
               <View style={styles.loadingContainer}>
                 <LoadingGif size={100} />
-                <Text style={styles.loadingText}>Loading exercises...</Text>
               </View>
             ) : exerciseError ? (
               <View style={styles.errorContainer}>
@@ -321,10 +424,10 @@ export default function AddSchedule() {
                     key={ex._id || idx}
                     style={styles.optionItem}
                     onPress={() => {
-                      setTempExercise({ 
-                        ...tempExercise, 
+                      setTempExercise({
+                        ...tempExercise,
                         name: ex.name,
-                        exerciseId: ex._id 
+                        exerciseId: ex._id
                       });
                       setExerciseModalVisible(false);
                     }}
@@ -333,8 +436,8 @@ export default function AddSchedule() {
                       <Text style={styles.optionText}>{ex.name}</Text>
                       {ex.description && (
                         <Text style={styles.optionDescription}>
-                          {ex.description.length > 50 
-                            ? ex.description.substring(0, 50) + "..." 
+                          {ex.description.length > 50
+                            ? ex.description.substring(0, 50) + "..."
                             : ex.description}
                         </Text>
                       )}
@@ -396,9 +499,43 @@ export default function AddSchedule() {
       <ScrollView style={{ maxHeight: 200, marginTop: 20 }}>
         {exercises.map((ex, idx) => (
           <View key={idx} style={styles.exerciseItem}>
-            <Text style={{ color: "#fff", fontFamily: "Poppins_400Regular" }}>
-              {ex.name} - {ex.sets} x {ex.reps} ({ex.weight}kg, Rest {ex.rest}s)
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#fff", fontFamily: "Poppins_400Regular" }}>
+                {ex.name} - {ex.sets} x {ex.reps} ({ex.weight}kg, Rest {ex.rest}s)
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  // Load exercise data into form for editing
+                  setTempExercise(ex);
+                  // Remove from list so it can be re-added after editing
+                  setExercises(exercises.filter((_, i) => i !== idx));
+                }}
+                style={{ padding: 5 }}
+              >
+                <Feather name="edit-2" size={18} color="#d5ff5f" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Delete Exercise',
+                    `Remove ${ex.name} from the workout?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => setExercises(exercises.filter((_, i) => i !== idx))
+                      }
+                    ]
+                  );
+                }}
+                style={{ padding: 5 }}
+              >
+                <Feather name="trash-2" size={18} color="#ff6b6b" />
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -453,15 +590,21 @@ export default function AddSchedule() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle="light-content" backgroundColor="black" />
 
-      {/* Header */}
+      {/* Custom Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={{ padding: 5 }}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Schedule</Text>
+        <Text style={styles.headerTitle}>
+          {isEditMode ? 'Edit Schedule' : 'Add Schedule'}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 5 }}>
           <Feather name="x" size={22} color="#fff" />
         </TouchableOpacity>
@@ -495,11 +638,11 @@ export default function AddSchedule() {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
           <Text style={styles.nextBtnText}>
-            {currentStep === totalSteps ? "Finish" : "Next"}
+            {currentStep === totalSteps ? (isEditMode ? "Update" : "Finish") : "Next"}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -507,7 +650,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   header: {
     paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 10,
-    paddingBottom: 25,
+    paddingBottom: 15,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -516,9 +659,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "white",
-    fontSize: 23,
+    fontSize: 20,
+    fontFamily: "Poppins_500Medium",
   },
-  
+
   text: {
     color: "#777",
     textAlign: "center",
@@ -540,6 +684,8 @@ const styles = StyleSheet.create({
   stepProgress: {
     height: 6,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     borderRadius: 3,
   },
   stepText: {
@@ -598,6 +744,9 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   footer: {
     position: "absolute",
@@ -605,6 +754,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 25,
     paddingVertical: 20,
     borderTopWidth: 1,
@@ -652,8 +803,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#1e1d1dff",
   },
-  optionText: { 
-    color: "#fff", 
+  optionText: {
+    color: "#fff",
     fontSize: 16,
     fontFamily: "Poppins_400Regular",
   },
@@ -690,6 +841,8 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,

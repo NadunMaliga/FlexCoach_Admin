@@ -125,7 +125,7 @@ class ChatService {
         throw new Error('No auth token found');
       }
       
-      console.log('Auth token found:', token.substring(0, 20) + '...');
+      Logger.log('Token operation completed');
 
       // Test connection with a simple API call
       console.log(`Attempting to connect to: ${this.chatServerUrl}/health`);
@@ -587,7 +587,7 @@ class ChatService {
       image: imageUrl,
       audio: audioUrl,
       timestamp: msg.createdAt,
-      isRead: msg.isRead
+      read: msg.isRead || false // Map isRead to read for UI
     };
   }
 }

@@ -10,6 +10,9 @@ import Logger from '../utils/logger';
 // Detect if we're in development mode
 const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
+// TEMPORARY: Force production URLs even in development for VPS testing
+const forceProduction = true;
+
 // Environment configurations
 const ENV = {
   development: {
@@ -25,9 +28,9 @@ const ENV = {
   },
   
   production: {
-    // Production - UPDATE THESE BEFORE DEPLOYING!
-    API_URL: 'https://api.flexcoach.com',
-    CHAT_URL: 'https://chat.flexcoach.com',
+    // Production - VPS Domain URLs
+    API_URL: 'https://admin.flexcoach.publicvm.com',
+    CHAT_URL: 'https://chat.flexcoach.publicvm.com',
     
     // Production settings
     API_TIMEOUT: 30000, // 30 seconds
@@ -37,7 +40,7 @@ const ENV = {
 };
 
 // Select current environment
-const currentEnv = isDev ? 'development' : 'production';
+const currentEnv = (isDev && !forceProduction) ? 'development' : 'production';
 const config = ENV[currentEnv];
 
 // Export configuration

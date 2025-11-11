@@ -5,8 +5,8 @@ Poppins_400Regular,
     useFonts,
 } from "@expo-google-fonts/poppins";
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -20,20 +20,37 @@ import {
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
-import LoadingGif from '../components/LoadingGif';
+import OfflineApiService from "../services/OfflineApiService";
+import ListSkeleton from '../components/ListSkeleton';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 export default function ExercisePlan() {
     const router = useRouter();
-    const { userId } = useLocalSearchParams();
+    const { userId, preloadedData: preloadedDataParam } = useLocalSearchParams();
 
     Logger.log('ExercisePlan component loaded with userId:', userId);
 
-    // State for workout schedules
-    const [schedules, setSchedules] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // Parse preloaded data if available - memoized to prevent re-parsing
+    const preloadedData = useMemo(() => {
+        if (preloadedDataParam) {
+            try {
+                const parsed = JSON.parse(preloadedDataParam);
+                Logger.log('🚀 Using preloaded exercise data:', parsed?.length || 0, 'items');
+                return parsed;
+            } catch (e) {
+                Logger.error('Error parsing preloaded data:', e);
+                return null;
+            }
+        }
+        return null;
+    }, [preloadedDataParam]);
+
+    // State for workout schedules - initialize with preloaded data if available
+    const [schedules, setSchedules] = useState(preloadedData || []);
+    const [loading, setLoading] = useState(!preloadedData);
     const [error, setError] = useState(null);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(!!preloadedData);
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -42,9 +59,18 @@ export default function ExercisePlan() {
     });
 
     useEffect(() => {
-        if (userId) {
+        // Skip loading if we already have preloaded data
+        if (preloadedData && preloadedData.length > 0) {
+            Logger.log('✅ Preloaded exercise data ready - skipping API call');
+            setHasLoadedOnce(true);
+            setLoading(false);
+            return;
+        }
+        
+        // Load data if no preloaded data available and haven't loaded yet
+        if (userId && !hasLoadedOnce) {
             loadWorkoutSchedules();
-        } else {
+        } else if (!userId) {
             // If no userId, use mock data
             setSchedules([
                 { _id: "1", day: "Day 1", detail: "Exercise 5 - Duration 50 min", status: "Completed", isCompleted: true },
@@ -54,7 +80,18 @@ export default function ExercisePlan() {
             ]);
             setLoading(false);
         }
-    }, [userId]);
+    }, [userId, preloadedData]);
+
+    // Refresh data when screen comes into focus (e.g., after adding a schedule)
+    // But skip the first focus if we have preloaded data
+    useFocusEffect(
+        useCallback(() => {
+            if (userId && hasLoadedOnce) {
+                Logger.log('🔄 ExercisePlan focused - refreshing data');
+                loadWorkoutSchedules();
+            }
+        }, [userId, hasLoadedOnce])
+    );
 
     const loadWorkoutSchedules = async () => {
         try {
@@ -62,7 +99,7 @@ export default function ExercisePlan() {
             setError(null);
             Logger.log('Loading workout schedules for userId:', userId);
 
-            const response = await ApiService.getUserWorkoutSchedules(userId, {
+            const response = await OfflineApiService.getUserWorkoutSchedules(userId, {
                 limit: 50,
                 sortBy: 'scheduledDate',
                 sortOrder: 'asc'
@@ -486,6 +523,20 @@ export default function ExercisePlan() {
                                 )}
                             </View>
 
+                            {/* Edit Button */}
+                            <TouchableOpacity
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    if (item._id) {
+                                        Logger.log('Editing schedule:', item._id);
+                                        router.push(`/AddSchedule?userId=${userId}&scheduleId=${item._id}&mode=edit`);
+                                    }
+                                }}
+                                style={{ marginRight: 10, padding: 4 }}
+                            >
+                                <Feather name="edit-2" size={18} color="#d5ff5f" />
+                            </TouchableOpacity>
+
                             {/* Right Arrow */}
                             <Svg
                                 width={18}
@@ -506,24 +557,30 @@ export default function ExercisePlan() {
         );
     };
 
-    // Delete workout function
+    // Delete workout function with optimistic update
     const deleteWorkout = async (workoutId, workoutName) => {
+        // Optimistic update - remove immediately from UI
+        const previousSchedules = schedules;
+        setSchedules(prevSchedules =>
+            prevSchedules.filter(schedule => schedule._id !== workoutId)
+        );
+
         try {
             Logger.log('Deleting workout:', workoutId);
-            const response = await ApiService.deleteWorkoutSchedule(workoutId);
+            const response = await OfflineApiService.deleteWorkoutSchedule(workoutId);
 
             if (response.success) {
-                // Remove the workout from the local state
-                setSchedules(prevSchedules =>
-                    prevSchedules.filter(schedule => schedule._id !== workoutId)
-                );
-                Alert.alert('Success', `${workoutName} has been deleted successfully`);
+                showAlert('Success', '${workoutName} has been deleted successfully');
             } else {
-                Alert.alert('Error', 'Failed to delete workout schedule');
+                // Revert on failure
+                setSchedules(previousSchedules);
+                showAlert('Error', 'Failed to delete workout schedule');
             }
         } catch (error) {
             Logger.error('Delete workout error:', error);
-            Alert.alert('Error', 'Failed to delete workout schedule');
+            // Revert on error
+            setSchedules(previousSchedules);
+            showAlert('Error', 'Failed to delete workout schedule');
         }
     };
 
@@ -546,13 +603,11 @@ export default function ExercisePlan() {
         );
     };
 
-    if (loading) {
+    // Only show loading if we're actually loading and don't have preloaded data or existing schedules
+    if (loading && schedules.length === 0) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <LoadingGif size={80} />
-                <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
-                    Loading workout schedules...
-                </Text>
+            <View style={styles.container}>
+                <ListSkeleton count={6} />
             </View>
         );
     }
@@ -750,6 +805,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: "#d5ff5f",
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
         padding: 25,
         paddingVertical: 20,
         borderTopWidth: 1,

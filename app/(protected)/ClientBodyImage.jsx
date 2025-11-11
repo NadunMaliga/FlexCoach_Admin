@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
 Dimensions,
     Image,
@@ -10,9 +10,12 @@ Dimensions,
     Text,
     TouchableOpacity,
     View,
+    FlatList,
+    RefreshControl,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Logger from '../utils/logger';
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
 
 
@@ -27,12 +30,18 @@ export default function ClientBodyImage() {
   const [photos, setPhotos] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const CACHE_KEY = `user_photos_${userId}`;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   useEffect(() => {
     Logger.debug('ClientBodyImage useEffect - userId:', userId);
     if (userId) {
-      loadUserPhotos();
+      loadCachedPhotos();
     } else {
       Logger.log('❌ No userId provided');
       setError('No user ID provided');
@@ -40,14 +49,56 @@ export default function ClientBodyImage() {
     }
   }, [userId]);
 
-  const loadUserPhotos = async () => {
+  // Load cached photos first for instant display
+  const loadCachedPhotos = async () => {
     try {
-      setLoading(true);
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+        
+        if (age < CACHE_DURATION) {
+          Logger.log('📦 Using cached photos (age:', Math.round(age / 1000), 'seconds)');
+          setPhotos(data);
+          setLoading(false);
+          
+          // Prefetch images in background
+          data.forEach(photo => {
+            if (photo.front) Image.prefetch(photo.front);
+            if (photo.side) Image.prefetch(photo.side);
+            if (photo.back) Image.prefetch(photo.back);
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      Logger.log('Cache read error:', err);
+    }
+    
+    // No valid cache, load from server
+    loadUserPhotos();
+  };
+
+  const loadUserPhotos = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       
       Logger.debug('Loading photos for userId:', userId);
       
-      const response = await ApiService.getUserPhotos(userId);
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const response = await Promise.race([
+        OfflineApiService.getUserPhotos(userId),
+        timeoutPromise
+      ]);
       
       Logger.log('📸 Photos API response:', response);
       
@@ -56,15 +107,6 @@ export default function ClientBodyImage() {
         
         // Transform backend data to match component format
         const transformedPhotos = response.photos.map(photo => {
-          Logger.debug('Processing photo:', {
-            id: photo._id,
-            date: photo.date,
-            photos: photo.photos,
-            front: photo.photos?.front,
-            side: photo.photos?.side,
-            back: photo.photos?.back
-          });
-          
           return {
             id: photo._id,
             date: new Date(photo.date).toLocaleDateString(),
@@ -75,8 +117,25 @@ export default function ClientBodyImage() {
           };
         });
         
-        Logger.log('🔄 Transformed photos:', transformedPhotos);
         setPhotos(transformedPhotos);
+        
+        // Cache the data
+        try {
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+            data: transformedPhotos,
+            timestamp: Date.now()
+          }));
+          Logger.log('💾 Photos cached successfully');
+        } catch (cacheErr) {
+          Logger.log('Cache write error:', cacheErr);
+        }
+        
+        // Prefetch images for smooth scrolling
+        transformedPhotos.slice(0, 6).forEach(photo => {
+          if (photo.front) Image.prefetch(photo.front);
+          if (photo.side) Image.prefetch(photo.side);
+          if (photo.back) Image.prefetch(photo.back);
+        });
       } else {
         Logger.log('❌ Photos API failed:', response);
         setError('Failed to load photos');
@@ -85,27 +144,31 @@ export default function ClientBodyImage() {
       Logger.failure('Error loading photos:', err);
       setError(err.message || 'Failed to load photos');
       
-      // Set sample data as fallback for testing
-      Logger.log('🔄 Setting fallback sample data');
-      setPhotos([
-        {
-          id: 'sample-1',
-          date: new Date().toLocaleDateString(),
-          front: "https://picsum.photos/300/400?random=1",
-          side: "https://picsum.photos/300/400?random=2",
-          back: "https://picsum.photos/300/400?random=3",
-        },
-      ]);
+      // Try to use cached data even if expired
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data } = JSON.parse(cached);
+          setPhotos(data);
+          setError('Using offline data');
+        }
+      } catch (cacheErr) {
+        Logger.log('Failed to load cached data:', cacheErr);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = useCallback(() => {
+    loadUserPhotos(true);
+  }, [userId]);
 
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <LoadingGif size={100} />
-        <Text style={{ color: '#fff', marginTop: 10 }}>Loading photos...</Text>
       </View>
     );
   }
@@ -135,18 +198,6 @@ export default function ClientBodyImage() {
         <Text style={styles.header}>Back</Text>
       </View>
       
-      {/* Debug info */}
-      <View style={{ padding: 10, backgroundColor: '#333' }}>
-        <Text style={{ color: '#fff', fontSize: 12 }}>
-          Debug: {photos.length} photos loaded for user {userId}
-        </Text>
-        {photos.length > 0 && (
-          <Text style={{ color: '#fff', fontSize: 10 }}>
-            First photo URLs: F:{photos[0].front?.substring(0, 50)}...
-          </Text>
-        )}
-      </View>
-
       {photos.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center' }}>
@@ -154,9 +205,18 @@ export default function ClientBodyImage() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView 
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#d5ff5f"
+              colors={["#d5ff5f"]}
+            />
+          }
+        >
           {photos.map((item, idx) => {
-            Logger.debug('Rendering photo item:', idx, item);
             return (
             <View key={item.id || idx} style={styles.row}>
               <TouchableOpacity
@@ -166,7 +226,7 @@ export default function ClientBodyImage() {
                 <Image
                   source={{ uri: item.front || 'https://picsum.photos/300/400?random=1' }}
                   style={styles.photo}
-                  resizeMode="contain"
+                  resizeMode="cover"
                   onLoad={() => Logger.success('Front image loaded:', item.front)}
                   onError={(error) => Logger.log('❌ Front image error:', error.nativeEvent.error, 'URL:', item.front)}
                 />
@@ -180,7 +240,7 @@ export default function ClientBodyImage() {
                 <Image
                   source={{ uri: item.side || 'https://picsum.photos/300/400?random=2' }}
                   style={styles.photo}
-                  resizeMode="contain"
+                  resizeMode="cover"
                   onLoad={() => Logger.success('Side image loaded:', item.side)}
                   onError={(error) => Logger.log('❌ Side image error:', error.nativeEvent.error, 'URL:', item.side)}
                 />
@@ -194,7 +254,7 @@ export default function ClientBodyImage() {
                 <Image
                   source={{ uri: item.back || 'https://picsum.photos/300/400?random=3' }}
                   style={styles.photo}
-                  resizeMode="contain"
+                  resizeMode="cover"
                   onLoad={() => Logger.success('Back image loaded:', item.back)}
                   onError={(error) => Logger.log('❌ Back image error:', error.nativeEvent.error, 'URL:', item.back)}
                 />

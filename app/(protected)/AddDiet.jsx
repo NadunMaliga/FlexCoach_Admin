@@ -2,34 +2,39 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Logger from '../utils/logger';
 import LoadingGif from '../components/LoadingGif';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 // Safe API import
-let ApiService = null;
+let OfflineApiService = null;
 try {
-  ApiService = require("../services/api").default;
+  OfflineApiService = require("../services/OfflineApiService").default;
 } catch (error) {
-  Logger.error("Failed to import ApiService:", error);
+  Logger.error("Failed to import OfflineApiService:", error);
 }
 
 export default function AddDiet() {
   const router = useRouter();
-  const { userId } = useLocalSearchParams();
+  const { userId, dietId, mode } = useLocalSearchParams();
+  const isEditMode = mode === 'edit' && !!dietId; // Convert to boolean
   const totalSteps = 3;
   const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode); // Start loading if in edit mode
 
   // Step 1 - Meal Plan Selection
   const mealPlanOptions = ["Meal 1", "Meal 2", "Meal 3"];
@@ -39,7 +44,7 @@ export default function AddDiet() {
   // Step 2 - Food Selection
   const mealTypes = ["Morning", "Breakfast", "Snacks", "Lunch", "Post-Workout", "Dinner"];
   const [foodOptions, setFoodOptions] = useState([
-    "Chicken Breast", "Eggs", "Oats", "Banana", "Fish", 
+    "Chicken Breast", "Eggs", "Oats", "Banana", "Fish",
     "Rice", "Vegetables", "Protein Scoop", "Almonds", "Sweet Potato"
   ]);
   const [loadingFoods, setLoadingFoods] = useState(false);
@@ -54,15 +59,15 @@ export default function AddDiet() {
   // Load foods and existing meal plans from database
   const loadFoods = async () => {
     if (!ApiService) return;
-    
+
     try {
       setLoadingFoods(true);
-      const response = await ApiService.getFoods({
+      const response = await OfflineApiService.getFoods({
         limit: 100,
         sortBy: 'name',
         sortOrder: 'asc'
       });
-      
+
       if (response.success && response.foods) {
         const foodNames = response.foods.map(food => food.name);
         setFoodOptions(foodNames);
@@ -77,11 +82,11 @@ export default function AddDiet() {
 
   const loadExistingMealPlans = async () => {
     if (!ApiService) return;
-    
+
     try {
       const validUserId = userId || "68e8fd08e8d1859ebd9edd05";
-      const response = await ApiService.getUserDietPlans(validUserId);
-      
+      const response = await OfflineApiService.getUserDietPlans(validUserId);
+
       if (response.success && response.dietPlans) {
         const existingNames = response.dietPlans.map(plan => plan.name);
         setExistingMealPlans(existingNames);
@@ -95,15 +100,76 @@ export default function AddDiet() {
   useEffect(() => {
     loadFoods();
     loadExistingMealPlans();
+    
+    // Load existing diet data if in edit mode
+    if (isEditMode) {
+      loadDietForEdit();
+    }
   }, []);
+
+  // Load existing diet data for editing
+  const loadDietForEdit = async () => {
+    if (!ApiService || !dietId) return;
+    
+    try {
+      setLoading(true);
+      Logger.log('Loading diet for edit, dietId:', dietId);
+      
+      const response = await OfflineApiService.getUserDietPlans(userId);
+      
+      if (response.success && response.dietPlans) {
+        const dietToEdit = response.dietPlans.find(d => d._id === dietId);
+        
+        if (dietToEdit) {
+          Logger.log('Found diet to edit:', dietToEdit);
+          
+          // Set meal plan name
+          setSelectedMealPlan(dietToEdit.name || '');
+          
+          // Transform meals back to addedFoods format (array of food objects)
+          const transformedFoods = {};
+          dietToEdit.meals.forEach(meal => {
+            const foodList = meal.foods.map(food => {
+              // Reconstruct the quantity string from quantity + unit
+              let quantityStr;
+              if (food.unit && food.unit !== 'serving' && food.unit !== '') {
+                quantityStr = `${food.quantity} ${food.unit}`;
+              } else {
+                quantityStr = `${food.quantity}`;
+              }
+              
+              return {
+                name: food.foodName,
+                quantity: quantityStr
+              };
+            });
+            
+            transformedFoods[meal.time] = foodList;
+          });
+          
+          setAddedFoods(transformedFoods);
+          Logger.log('Loaded foods for editing:', transformedFoods);
+        } else {
+          Logger.error('Diet not found with ID:', dietId);
+          showAlert('Error', 'Diet plan not found');
+          router.back();
+        }
+      }
+    } catch (error) {
+      Logger.error('Error loading diet for edit:', error);
+      showAlert('Error', 'Failed to load diet plan');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onNext = async () => {
     if (currentStep === 1 && !selectedMealPlan.trim()) {
-      Alert.alert("Error", "Please select a meal plan");
+      showAlert('Error', 'Please select a meal plan');
       return;
     }
     if (currentStep === 2 && Object.keys(addedFoods).length === 0) {
-      Alert.alert("Error", "Please add at least one meal");
+      showAlert('Error', 'Please add at least one meal');
       return;
     }
 
@@ -135,7 +201,7 @@ export default function AddDiet() {
 
   const saveDietPlan = async () => {
     if (!ApiService) {
-      Alert.alert("Error", "API service not available");
+      showAlert('Error', 'API service not available');
       return;
     }
 
@@ -160,7 +226,7 @@ export default function AddDiet() {
             const numericMatch = food.quantity.match(/^\d+(\.\d+)?/);
             const numericPart = numericMatch ? (parseFloat(numericMatch[0]) || 0) : 1;
             const textPart = food.quantity.replace(/^\d+(\.\d+)?\s*/, '') || 'serving';
-            
+
             return {
               foodName: food.name,
               quantity: numericPart, // Numeric part for database
@@ -194,29 +260,36 @@ export default function AddDiet() {
 
       Logger.log('Saving diet plan:', dietPlanData);
 
-      // Check if this specific meal plan already exists for this user
-      const existingPlansResponse = await ApiService.getUserDietPlans(validUserId);
-      let existingPlan = null;
-
-      if (existingPlansResponse.success && existingPlansResponse.dietPlans) {
-        existingPlan = existingPlansResponse.dietPlans.find(
-          plan => plan.name === selectedMealPlan
-        );
-      }
-
       let response;
       let actionMessage;
 
-      if (existingPlan) {
-        // Update existing diet plan
-        Logger.log(`Updating existing ${selectedMealPlan} with ID: ${existingPlan._id}`);
-        response = await ApiService.updateDietPlan(existingPlan._id, dietPlanData);
+      if (isEditMode && dietId) {
+        // Update existing diet plan (edit mode)
+        Logger.log(`Updating diet plan with ID: ${dietId}`);
+        response = await OfflineApiService.updateDietPlan(dietId, dietPlanData);
         actionMessage = `${selectedMealPlan} updated successfully!`;
       } else {
-        // Create new diet plan
-        Logger.log(`Creating new ${selectedMealPlan}`);
-        response = await ApiService.createDietPlan(dietPlanData);
-        actionMessage = `${selectedMealPlan} created successfully!`;
+        // Check if this specific meal plan already exists for this user
+        const existingPlansResponse = await OfflineApiService.getUserDietPlans(validUserId);
+        let existingPlan = null;
+
+        if (existingPlansResponse.success && existingPlansResponse.dietPlans) {
+          existingPlan = existingPlansResponse.dietPlans.find(
+            plan => plan.name === selectedMealPlan
+          );
+        }
+
+        if (existingPlan) {
+          // Update existing diet plan (found by name)
+          Logger.log(`Updating existing ${selectedMealPlan} with ID: ${existingPlan._id}`);
+          response = await OfflineApiService.updateDietPlan(existingPlan._id, dietPlanData);
+          actionMessage = `${selectedMealPlan} updated successfully!`;
+        } else {
+          // Create new diet plan
+          Logger.log(`Creating new ${selectedMealPlan}`);
+          response = await OfflineApiService.createDietPlan(dietPlanData);
+          actionMessage = `${selectedMealPlan} created successfully!`;
+        }
       }
 
       if (response.success) {
@@ -236,7 +309,7 @@ export default function AddDiet() {
 
     } catch (error) {
       Logger.error('Save diet plan error:', error);
-      Alert.alert("Error", "Failed to save diet plan. Please try again.");
+      showAlert('Error', 'Failed to save diet plan. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -347,12 +420,60 @@ export default function AddDiet() {
                 {meal}:
               </Text>
               {foods.map((f, idx) => (
-                <Text
+                <View
                   key={idx}
-                  style={{ color: "#b8b5b5ff", marginLeft: 10, marginBottom: 2 }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginLeft: 10,
+                    marginBottom: 5,
+                    backgroundColor: "#2a2a2a",
+                    padding: 8,
+                    borderRadius: 8,
+                  }}
                 >
-                  • {f.name} - {f.quantity}
-                </Text>
+                  <Text style={{ color: "#b8b5b5ff", flex: 1 }}>
+                    • {f.name} - {f.quantity}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Edit food item
+                        setTempFood({ name: f.name, quantity: f.quantity });
+                        setSelectedMealType(meal);
+                        // Remove the item so it can be re-added after editing
+                        setAddedFoods((prev) => {
+                          const updated = { ...prev };
+                          updated[meal] = updated[meal].filter((_, i) => i !== idx);
+                          if (updated[meal].length === 0) {
+                            delete updated[meal];
+                          }
+                          return updated;
+                        });
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Feather name="edit-2" size={16} color="#d5ff5f" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Delete food item
+                        setAddedFoods((prev) => {
+                          const updated = { ...prev };
+                          updated[meal] = updated[meal].filter((_, i) => i !== idx);
+                          if (updated[meal].length === 0) {
+                            delete updated[meal];
+                          }
+                          return updated;
+                        });
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Feather name="trash-2" size={16} color="#ff6b6b" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               ))}
             </View>
           ))
@@ -379,7 +500,6 @@ export default function AddDiet() {
               {loadingFoods ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
                   <LoadingGif size={24} />
-                  <Text style={{ color: '#fff', marginTop: 10 }}>Loading foods...</Text>
                 </View>
               ) : (
                 foodOptions.map((food, idx) => (
@@ -438,7 +558,11 @@ export default function AddDiet() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <StatusBar barStyle="light-content" backgroundColor="black" />
 
       <View style={styles.stepIndicator}>
@@ -454,8 +578,9 @@ export default function AddDiet() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 20 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {renderStep()}
       </ScrollView>
@@ -467,7 +592,7 @@ export default function AddDiet() {
           disabled={loading}
         >
           {loading ? (
-            <LoadingGif size={24} />
+            <ActivityIndicator size="small" color="#d5ff5f" />
           ) : (
             <Text style={styles.nextBtnText}>
               {currentStep === totalSteps ? "Confirm" : "Next"}
@@ -475,7 +600,7 @@ export default function AddDiet() {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -522,6 +647,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: "#171717ff",

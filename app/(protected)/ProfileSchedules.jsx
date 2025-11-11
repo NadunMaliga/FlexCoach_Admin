@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
 
 
@@ -52,7 +52,7 @@ export default function ProfileSchedules() {
       
       Logger.log('Loading workout details for ID:', workoutId);
       
-      const response = await ApiService.getWorkoutScheduleDetails(workoutId);
+      const response = await OfflineApiService.getWorkoutScheduleDetails(workoutId);
       
       if (response.success) {
         setWorkoutData(response.workoutSchedule);
@@ -179,9 +179,6 @@ export default function ProfileSchedules() {
       {loading ? (
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <LoadingGif size={100} />
-          <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
-            Loading workout details...
-          </Text>
         </View>
       ) : (
         /* Exercises List */

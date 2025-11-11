@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Svg, { Path } from "react-native-svg";
 
 import {
@@ -10,6 +10,7 @@ Poppins_300Light,
     useFonts,
 } from "@expo-google-fonts/poppins";
 import {
+    Animated,
     Image,
     Modal,
     RefreshControl,
@@ -18,13 +19,18 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Platform,
+    StatusBar,
 } from "react-native";
 import Logger from '../utils/logger';
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import ClientsSkeleton from '../components/ClientsSkeleton';
 import ProfileAvatar from '../components/ProfileAvatar';
 import LoadingGif from '../components/LoadingGif';
+import EmptyState from '../components/EmptyState';
+import { validateUserId, validateName, validateEmail, sanitizeString } from '../utils/validators';
+import HapticFeedback from '../utils/haptics';
 
 
 
@@ -35,17 +41,49 @@ const SearchIcon = ({ size = 25, color = "#999" }) => (
   </Svg>
 );
 
-export default function Clients() {
+export default function Clients({ initialFilter = "All" }) {
   const [searchText, setSearchText] = useState("");
   const router = useRouter();
 
-  const [filter, setFilter] = useState("All"); // All, Active, Inactive
+  const [filter, setFilter] = useState(initialFilter); // All, Active, Inactive
+
+  // Update filter when initialFilter prop changes
+  React.useEffect(() => {
+    if (initialFilter) {
+      setFilter(initialFilter);
+    }
+  }, [initialFilter]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState(0);
+  const [lastParams, setLastParams] = useState({ filter: "All", search: "" });
+  const [fadeAnim] = useState(new Animated.Value(1));
+  const [skeletonAnim] = useState(new Animated.Value(0));
+
+  // Skeleton pulse animation
+  useEffect(() => {
+    if (loading && users.length === 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(skeletonAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skeletonAnim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [loading, users.length]);
 
   let [fontsLoaded] = useFonts({
     Poppins_300Light,
@@ -55,13 +93,33 @@ export default function Clients() {
   });
 
   useEffect(() => {
-    loadUsers();
+    // Only reload if filter/search changed or data is stale
+    const now = Date.now();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    const paramsChanged = lastParams.filter !== filter || lastParams.search !== searchText;
+    
+    if (paramsChanged || users.length === 0 || now - lastLoadTime > CACHE_DURATION) {
+      loadUsers();
+      setLastParams({ filter, search: searchText });
+    } else {
+      setLoading(false); // Use cached data
+    }
   }, [filter, searchText]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       setError(null);
+      setLastLoadTime(Date.now()); // Update cache timestamp
+
+      // Fade out if there's existing data
+      if (users.length > 0) {
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 150,
+          useNativeDriver: true,
+        }).start();
+      }
 
       const params = {
         limit: 50,
@@ -69,45 +127,84 @@ export default function Clients() {
         sortOrder: 'desc'
       };
 
-      // Apply filters
+      // Apply filters (using isApproved field)
       if (filter === 'Active') {
-        params.isActive = 'true';
+        params.isApproved = 'true';
       } else if (filter === 'Inactive') {
-        params.isActive = 'false';
+        params.isApproved = 'false';
       }
 
       if (searchText.trim()) {
         params.search = searchText.trim();
       }
 
-      const response = await ApiService.getUsers(params);
+      const response = await OfflineApiService.getUsers(params);
 
       if (response.success) {
         Logger.log(`📋 Loaded ${response.users.length} users`);
         
-        // Map users directly - profile photo is already in user object
-        const usersData = response.users.map((user) => {
-          return {
-            id: user._id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            profilePhoto: user.profilePhoto,
-            gender: user.gender,
-            name: `${user.firstName} ${user.lastName}`,
-            daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
-            status: user.isActive ? "Active" : "Inactive",
-            userData: user // Store full user data for navigation
-          };
-        });
+        // Fetch profile photos from UserProfiles for each user
+        const usersWithProfiles = await Promise.all(
+          response.users.map(async (user) => {
+            try {
+              const profileResponse = await OfflineApiService.getUserProfile(user._id);
+              const profilePhoto = profileResponse.success 
+                ? profileResponse.userProfile.profilePhoto 
+                : null;
+              
+              const finalProfilePhoto = profilePhoto || user.profilePhoto;
+              
+              return {
+                id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                profilePhoto: finalProfilePhoto, // Use UserProfile photo first, fallback to User photo
+                gender: user.gender,
+                name: `${user.firstName} ${user.lastName}`,
+                daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
+                status: user.isApproved ? "Active" : "Inactive",
+                userData: { ...user, profilePhoto: finalProfilePhoto } // Include profile photo in userData
+              };
+            } catch (err) {
+              Logger.log(`Profile not found for ${user.firstName} ${user.lastName}:`, err.message);
+              return {
+                id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                profilePhoto: user.profilePhoto,
+                gender: user.gender,
+                name: `${user.firstName} ${user.lastName}`,
+                daysAgo: Math.floor((new Date() - new Date(user.createdAt)) / (1000 * 60 * 60 * 24)),
+                status: user.isApproved ? "Active" : "Inactive",
+                userData: user
+              };
+            }
+          })
+        );
         
-        setUsers(usersData);
+        setUsers(usersWithProfiles);
+        
+        // Fade in with new data
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
       }
     } catch (err) {
       Logger.error('Load users error:', err);
       setError(err.message);
+      // Restore opacity on error
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   };
 
@@ -145,30 +242,38 @@ export default function Clients() {
       if (!selectedUser) return;
 
       const newStatus = selectedUser.status === "Active" ? false : true;
-      const response = await ApiService.updateUserStatus(selectedUser.id, newStatus);
+      const response = await OfflineApiService.updateUserStatus(selectedUser.id, newStatus);
 
       if (response.success) {
+        HapticFeedback.success(); // Success haptic
         setModalVisible(false);
         await loadUsers(); // Reload to get fresh data
       } else {
+        HapticFeedback.error(); // Error haptic
         Logger.error('Status change failed:', response.error);
       }
     } catch (err) {
+      HapticFeedback.error(); // Error haptic
       Logger.error('Status change error:', err);
     }
   };
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
+      <View style={{ height: statusBarHeight }} />
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <SearchIcon size={25} color="#999" />
         <TextInput
           placeholder="Search users..."
+          accessibilityLabel="Search users"
+          accessibilityHint="Type to search for users by name"
           placeholderTextColor="#999"
           style={styles.searchInput}
           value={searchText}
-          onChangeText={setSearchText}
+          onChangeText={(text) => setSearchText(sanitizeString(text))}
         />
       </View>
 
@@ -181,7 +286,10 @@ export default function Clients() {
               styles.filterButton,
               filter === item && styles.filterButtonActive,
             ]}
-            onPress={() => setFilter(item)}
+            onPress={() => {
+              HapticFeedback.selection(); // Selection feedback
+              setFilter(item);
+            }}
           >
             <Text
               style={[
@@ -199,38 +307,162 @@ export default function Clients() {
       </View>
 
       {/* Users List */}
-      <ScrollView
-        style={{ flex: 1 }}
+      <Animated.ScrollView
+        style={{ flex: 1, opacity: fadeAnim }}
         contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#d5ff5f" />
         }
       >
-        {loading && !refreshing && (
-          <View style={{ alignItems: 'center', marginTop: 50 }}>
-            <LoadingGif size={100} />
-            <Text style={{ color: '#fff', marginTop: 10 }}>Loading users...</Text>
-          </View>
-        )}
-
         {error && (
           <Text style={{ color: '#ff6b6b', textAlign: 'center', margin: 20 }}>
             Error: {error}
           </Text>
         )}
-        {filteredUsers.map((user) => (
+        
+        {/* Show skeleton loader only when loading and no data */}
+        {loading && users.length === 0 && (
+          <View>
+            {[1, 2, 3, 4, 5].map((item) => (
+              <View key={item} style={styles.skeletonCard}>
+                <Animated.View 
+                  style={[
+                    styles.skeletonAvatar,
+                    {
+                      opacity: skeletonAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 0.8],
+                      })
+                    }
+                  ]} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Animated.View 
+                    style={[
+                      styles.skeletonName,
+                      {
+                        opacity: skeletonAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.5, 0.8],
+                        })
+                      }
+                    ]} 
+                  />
+                  <Animated.View 
+                    style={[
+                      styles.skeletonDate,
+                      {
+                        opacity: skeletonAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.5, 0.8],
+                        })
+                      }
+                    ]} 
+                  />
+                </View>
+                <Animated.View 
+                  style={[
+                    styles.skeletonBadge,
+                    {
+                      opacity: skeletonAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 0.8],
+                      })
+                    }
+                  ]} 
+                />
+              </View>
+            ))}
+          </View>
+        )}
+        
+        {!loading && filteredUsers.map((user) => (
           <TouchableOpacity
             key={user.id}
             style={styles.userRow}
-            onPress={() =>
-              router.push({
-                pathname: "/ClientProfile",
-                params: { 
-                  userId: user.id,
-                  user: JSON.stringify(user.userData || user) 
+            onPress={async () => {
+              HapticFeedback.light(); // Light tap feedback
+              // Preload exercise and diet data in the background for instant tab switching
+              Logger.log('🚀 Preloading data for user:', user.id);
+              
+              // Start both API calls in parallel (don't await)
+              const exercisePromise = OfflineApiService.getUserWorkoutSchedules(user.id, {
+                limit: 50,
+                sortBy: 'scheduledDate',
+                sortOrder: 'asc'
+              }).then(response => {
+                if (response.success && response.workoutSchedules) {
+                  const transformedSchedules = response.workoutSchedules.map((schedule, index) => ({
+                    _id: schedule._id,
+                    day: schedule.day || `Day ${index + 1}`,
+                    detail: `${schedule.exercises?.length || 0} exercises - Duration ${schedule.estimatedDuration || 'N/A'} min`,
+                    status: schedule.isCompleted ? "Completed" : "Not Completed",
+                    isCompleted: schedule.isCompleted,
+                    name: schedule.name,
+                    workoutType: schedule.workoutType,
+                    scheduledDate: schedule.scheduledDate,
+                    exercises: schedule.exercises
+                  }));
+                  Logger.log('✅ Preloaded exercise data:', transformedSchedules.length, 'schedules');
+                  return transformedSchedules;
                 }
-              })
-            }
+                return [];
+              }).catch(err => {
+                Logger.error('Preload exercise error:', err);
+                return [];
+              });
+
+              const dietPromise = OfflineApiService.getUserDietPlans(user.id).then(response => {
+                if (response.success && response.dietPlans) {
+                  // Transform to match DietPlan component's expected format
+                  const transformedMeals = response.dietPlans.map((dietPlan, index) => {
+                    const mealDetails = {};
+
+                    // Group meals by time and create details object
+                    if (dietPlan.meals) {
+                      dietPlan.meals.forEach(meal => {
+                        const foodList = meal.foods.map(food => {
+                          let displayText;
+                          if (food.unit && food.unit !== 'serving' && food.unit !== '') {
+                            displayText = `${food.foodName} ${food.quantity} ${food.unit}`;
+                          } else {
+                            displayText = `${food.foodName} ${food.quantity}`;
+                          }
+                          return displayText;
+                        }).join('\n');
+
+                        mealDetails[meal.time] = foodList || meal.instructions || `${meal.name} - ${meal.totalCalories} calories`;
+                      });
+                    }
+
+                    return {
+                      _id: dietPlan._id,
+                      name: dietPlan.name || `Meal ${index + 1}`,
+                      details: mealDetails
+                    };
+                  });
+                  Logger.log('✅ Preloaded diet data:', transformedMeals.length, 'meals');
+                  return transformedMeals;
+                }
+                return [];
+              }).catch(err => {
+                Logger.error('Preload diet error:', err);
+                return [];
+              });
+
+              // Navigate immediately with preloaded data promises
+              Promise.all([exercisePromise, dietPromise]).then(([exerciseData, dietData]) => {
+                router.push({
+                  pathname: "/ClientProfile",
+                  params: { 
+                    userId: user.id,
+                    user: JSON.stringify(user.userData || user),
+                    preloadedExerciseData: JSON.stringify(exerciseData),
+                    preloadedDietData: JSON.stringify(dietData)
+                  }
+                });
+              });
+            }}
           >
             <ProfileAvatar 
               user={user} 
@@ -287,12 +519,14 @@ export default function Clients() {
         ))}
 
 
-        {filteredUsers.length === 0 && (
-          <Text style={{ color: "#999", textAlign: "center", marginTop: 50 }}>
-            No users found.
-          </Text>
+        {filteredUsers.length === 0 && !loading && (
+          <EmptyState
+            icon="users"
+            title="No users found"
+            message={searchText ? `No users match "${searchText}"` : "No users available"}
+          />
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Modal for Change Status */}
       <Modal
@@ -454,5 +688,40 @@ const styles = StyleSheet.create({
   modalBtnText: {
     fontSize: 16,
     fontFamily: "Poppins_500Medium",
+  },
+  
+  // Skeleton styles
+  skeletonCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 3,
+    marginBottom: 5,
+  },
+  skeletonAvatar: {
+    width: 65,
+    height: 65,
+    borderRadius: 50,
+    backgroundColor: "#2a2a2a",
+    marginRight: 13,
+  },
+  skeletonName: {
+    width: 150,
+    height: 18,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonDate: {
+    width: 100,
+    height: 13,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 4,
+  },
+  skeletonBadge: {
+    width: 80,
+    height: 32,
+    backgroundColor: "#2a2a2a",
+    borderRadius: 20,
   },
 });

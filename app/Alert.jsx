@@ -14,6 +14,11 @@ export default function Alert({
   message,
   buttonText,
   onClose,
+  isConfirm,
+  confirmText,
+  cancelText,
+  onConfirm,
+  onCancel,
 }) {
   const [fontsLoaded] = useFonts({
     Poppins_300Light,
@@ -29,9 +34,27 @@ export default function Alert({
         <View style={styles.container}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          <TouchableOpacity style={styles.button} onPress={onClose}>
-            <Text style={styles.buttonText}>{buttonText}</Text>
-          </TouchableOpacity>
+          
+          {isConfirm ? (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={[styles.button, styles.cancelButton]} 
+                onPress={onCancel}
+              >
+                <Text style={styles.cancelButtonText}>{cancelText || 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.button, styles.confirmButton]} 
+                onPress={onConfirm}
+              >
+                <Text style={styles.confirmButtonText}>{confirmText || 'Confirm'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.button} onPress={onClose}>
+              <Text style={styles.buttonText}>{buttonText}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -79,5 +102,29 @@ const styles = StyleSheet.create({
     color: "#b3b3b3ff",
     fontSize: 16,
     fontFamily: "Poppins_400Regular", // 🔹 clean button text
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#d5ff5f',
+    borderColor: '#d5ff5f',
+  },
+  cancelButtonText: {
+    color: "#b3b3b3ff",
+    fontSize: 16,
+    fontFamily: "Poppins_400Regular",
+  },
+  confirmButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
   },
 });

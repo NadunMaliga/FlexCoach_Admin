@@ -1,19 +1,25 @@
 import React from "react";
 import {
-Alert,
+  ActivityIndicator,
+  Animated,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  StatusBar,
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import ListSkeleton from '../components/ListSkeleton';
 import LoadingGif from '../components/LoadingGif';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 
@@ -70,6 +76,7 @@ export default function Foods() {
   const [foods, setFoods] = React.useState<Food[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [fadeAnim] = React.useState(new Animated.Value(1));
 
   const [modalVisible, setModalVisible] = React.useState(false);
   const [form, setForm] = React.useState({ 
@@ -97,15 +104,38 @@ export default function Foods() {
     try {
       setLoading(true);
       setError(null);
-      const response = await ApiService.getFoods({ limit: 100 });
+      
+      // Fade out while loading
+      if (foods.length > 0) {
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 150,
+          useNativeDriver: true,
+        }).start();
+      }
+      
+      const response = await OfflineApiService.getFoods({ limit: 100 });
       if (response.success) {
         setFoods(response.foods);
+        
+        // Fade in with loaded data
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
       } else {
         setError('Failed to load foods');
       }
     } catch (err) {
       Logger.error('Load foods error:', err);
       setError('Failed to load foods');
+      // Restore opacity on error
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     } finally {
       setLoading(false);
     }
@@ -119,7 +149,7 @@ export default function Foods() {
   // Add or update food
   const addFood = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Error', 'Please enter a food name');
+      showAlert('Error', 'Please enter a food name');
       return;
     }
 
@@ -128,21 +158,21 @@ export default function Foods() {
       Logger.log('Sending food data:', form);
       
       if (isEditing && selectedFood) {
-        const response = await ApiService.updateFood(selectedFood._id, form);
+        const response = await OfflineApiService.updateFood(selectedFood._id, form);
         if (response.success) {
           await loadFoods(); // Reload foods
-          Alert.alert('Success', 'Food updated successfully');
+          showAlert('Success', 'Food updated successfully');
         } else {
-          Alert.alert('Error', 'Failed to update food');
+          showAlert('Error', 'Failed to update food');
         }
       } else {
         Logger.log('Creating new food with data:', form);
-        const response = await ApiService.createFood(form);
+        const response = await OfflineApiService.createFood(form);
         if (response.success) {
           await loadFoods(); // Reload foods
-          Alert.alert('Success', 'Food created successfully');
+          showAlert('Success', 'Food created successfully');
         } else {
-          Alert.alert('Error', 'Failed to create food');
+          showAlert('Error', 'Failed to create food');
         }
       }
 
@@ -162,7 +192,7 @@ export default function Foods() {
       setSelectedFood(null);
     } catch (error) {
       Logger.error('Save food error:', error);
-      Alert.alert('Error', 'Failed to save food');
+      showAlert('Error', 'Failed to save food');
     } finally {
       setSaving(false);
     }
@@ -170,16 +200,16 @@ export default function Foods() {
 
   const deleteFood = async (food: Food) => {
     try {
-      const response = await ApiService.deleteFood(food._id);
+      const response = await OfflineApiService.deleteFood(food._id);
       if (response.success) {
         await loadFoods(); // Reload foods
-        Alert.alert('Success', 'Food deleted successfully');
+        showAlert('Success', 'Food deleted successfully');
       } else {
-        Alert.alert('Error', 'Failed to delete food');
+        showAlert('Error', 'Failed to delete food');
       }
     } catch (error) {
       Logger.error('Delete food error:', error);
-      Alert.alert('Error', 'Failed to delete food');
+      showAlert('Error', 'Failed to delete food');
     }
   };
 
@@ -187,7 +217,6 @@ export default function Foods() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <LoadingGif size={100} />
-        <Text style={{ color: '#fff', marginTop: 10 }}>Loading foods...</Text>
       </View>
     );
   }
@@ -208,9 +237,13 @@ export default function Foods() {
     );
   }
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={styles.container}>
-      <ScrollView
+      <View style={{ height: statusBarHeight }} />
+      <Animated.ScrollView
+        style={{ opacity: fadeAnim }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         stickyHeaderIndices={[0]}
       >
@@ -262,7 +295,7 @@ export default function Foods() {
         {filteredFoods.length === 0 && (
           <Text style={styles.noDataText}>No foods found.</Text>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Floating Add Button */}
       <TouchableOpacity
@@ -283,69 +316,86 @@ export default function Foods() {
           });
         }}
       >
-        <AddCircleIcon size={40} color="#626161ff" />
+        <Text style={styles.addBtnText}>+</Text>
       </TouchableOpacity>
 
       {/* Add/Edit Food Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalHeader}>
-                {isEditing ? "Edit Food" : "Add Food"}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <CloseIcon size={28} color="white" />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              placeholder="Food Name"
-              placeholderTextColor="#999"
-              style={styles.modalInput}
-              value={form.name}
-              onChangeText={(t) => setForm({ ...form, name: t })}
-            />
-
-            {/* Category Picker */}
-            <View style={styles.modalInput}>
-              <Text style={{ color: '#999', marginBottom: 10 }}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {['Protein', 'Carbohydrates', 'Vegetables', 'Fruits', 'Dairy', 'Fats', 'Beverages', 'Snacks'].map((category) => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.categoryButton,
-                      form.category === category && styles.categoryButtonActive
-                    ]}
-                    onPress={() => setForm({ ...form, category: category as any })}
-                  >
-                    <Text style={[
-                      styles.categoryText,
-                      form.category === category && styles.categoryTextActive
-                    ]}>
-                      {category}
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay} 
+            activeOpacity={1} 
+            onPress={() => setModalVisible(false)}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <ScrollView 
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.modalBox}>
+                  <View style={styles.modalHeaderRow}>
+                    <Text style={styles.modalHeader}>
+                      {isEditing ? "Edit Food" : "Add Food"}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                    <TouchableOpacity onPress={() => setModalVisible(false)}>
+                      <CloseIcon size={28} color="white" />
+                    </TouchableOpacity>
+                  </View>
 
-            <TouchableOpacity 
-              style={[styles.saveButton, saving && { opacity: 0.7 }]} 
-              onPress={addFood}
-              disabled={saving}
-            >
-              {saving ? (
-                <LoadingGif size={40} />
-              ) : (
-                <Text style={styles.saveButtonText}>
-                  {isEditing ? "Update Food" : "Save Food"}
-                </Text>
-              )}
+                  <TextInput
+                    placeholder="Food Name"
+                    placeholderTextColor="#999"
+                    style={styles.modalInput}
+                    value={form.name}
+                    onChangeText={(t) => setForm({ ...form, name: t })}
+                  />
+
+                  {/* Category Picker */}
+                  <View style={styles.modalInput}>
+                    <Text style={{ color: '#999', marginBottom: 10 }}>Category</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {['Protein', 'Carbohydrates', 'Vegetables', 'Fruits', 'Dairy', 'Fats', 'Beverages', 'Snacks'].map((category) => (
+                        <TouchableOpacity
+                          key={category}
+                          style={[
+                            styles.categoryButton,
+                            form.category === category && styles.categoryButtonActive
+                          ]}
+                          onPress={() => setForm({ ...form, category: category as any })}
+                        >
+                          <Text style={[
+                            styles.categoryText,
+                            form.category === category && styles.categoryTextActive
+                          ]}>
+                            {category}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  <TouchableOpacity 
+                    style={[styles.saveButton, saving && { opacity: 0.7 }]} 
+                    onPress={addFood}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>
+                        {isEditing ? "Update Food" : "Save Food"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Action Modal */}
@@ -469,9 +519,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 100,
   },
+  addBtnText: {
+    fontSize: 40,
+    color: "black",
+    fontWeight: "300",
+  },
   modalContainer: {
     flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
     justifyContent: "flex-end",
   },
   modalContainer2: {

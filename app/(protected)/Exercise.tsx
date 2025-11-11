@@ -1,21 +1,27 @@
 import { useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
-Alert,
+  ActivityIndicator,
+  Animated,
+  Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  StatusBar,
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import ListSkeleton from '../components/ListSkeleton';
 import LoadingGif from '../components/LoadingGif';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 // SVG Icons
@@ -27,7 +33,7 @@ const SearchIcon = ({ size = 20, color = "#999" }) => (
 
 const YoutubeIcon = ({ size = 24, color = "#d5ff5f" }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-    <Path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+    <Path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
   </Svg>
 );
 
@@ -69,12 +75,13 @@ export default function ProfileSchedules() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fadeAnim] = useState(new Animated.Value(1));
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
-  const [form, setForm] = useState({ 
-    name: "", 
-    description: "", 
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
     videoUrl: ""
   });
   const [saving, setSaving] = useState(false);
@@ -92,15 +99,38 @@ export default function ProfileSchedules() {
     try {
       setLoading(true);
       setError(null);
-      const response = await ApiService.getExercises({ limit: 100 });
+
+      // Fade out while loading
+      if (exercises.length > 0) {
+        Animated.timing(fadeAnim, {
+          toValue: 0.3,
+          duration: 150,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      const response = await OfflineApiService.getExercises({ limit: 100 });
       if (response.success) {
         setExercises(response.exercises);
+
+        // Fade in with loaded data
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
       } else {
         setError('Failed to load exercises');
       }
     } catch (err) {
       Logger.error('Load exercises error:', err);
       setError('Failed to load exercises');
+      // Restore opacity on error
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     } finally {
       setLoading(false);
     }
@@ -114,37 +144,37 @@ export default function ProfileSchedules() {
   // Save new or edited exercise
   const addExercise = async () => {
     if (!form.name.trim() || !form.description.trim() || !form.videoUrl.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
     // Basic URL validation on frontend
     const urlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com)/i;
     if (!urlPattern.test(form.videoUrl) && !form.videoUrl.startsWith('http')) {
-      Alert.alert('Error', 'Please provide a valid video URL (YouTube, Vimeo, etc.)');
+      showAlert('Error', 'Please provide a valid video URL (YouTube, Vimeo, etc.)');
       return;
     }
 
     try {
       setSaving(true);
       Logger.log('Sending exercise data:', form);
-      
+
       if (isEditing && selectedExercise) {
-        const response = await ApiService.updateExercise(selectedExercise._id, form);
+        const response = await OfflineApiService.updateExercise(selectedExercise._id, form);
         if (response.success) {
           await loadExercises(); // Reload exercises
-          Alert.alert('Success', 'Exercise updated successfully');
+          showAlert('Success', 'Exercise updated successfully');
         } else {
-          Alert.alert('Error', 'Failed to update exercise');
+          showAlert('Error', 'Failed to update exercise');
         }
       } else {
         Logger.log('Creating new exercise with data:', form);
-        const response = await ApiService.createExercise(form);
+        const response = await OfflineApiService.createExercise(form);
         if (response.success) {
           await loadExercises(); // Reload exercises
-          Alert.alert('Success', 'Exercise created successfully');
+          showAlert('Success', 'Exercise created successfully');
         } else {
-          Alert.alert('Error', 'Failed to create exercise');
+          showAlert('Error', 'Failed to create exercise');
         }
       }
 
@@ -154,7 +184,7 @@ export default function ProfileSchedules() {
       setSelectedExercise(null);
     } catch (error) {
       Logger.error('Save exercise error:', error);
-      Alert.alert('Error', 'Failed to save exercise');
+      showAlert('Error', 'Failed to save exercise');
     } finally {
       setSaving(false);
     }
@@ -162,16 +192,16 @@ export default function ProfileSchedules() {
 
   const deleteExercise = async (exercise: Exercise) => {
     try {
-      const response = await ApiService.deleteExercise(exercise._id);
+      const response = await OfflineApiService.deleteExercise(exercise._id);
       if (response.success) {
         await loadExercises(); // Reload exercises
-        Alert.alert('Success', 'Exercise deleted successfully');
+        showAlert('Success', 'Exercise deleted successfully');
       } else {
-        Alert.alert('Error', 'Failed to delete exercise');
+        showAlert('Error', 'Failed to delete exercise');
       }
     } catch (error) {
       Logger.error('Delete exercise error:', error);
-      Alert.alert('Error', 'Failed to delete exercise');
+      showAlert('Error', 'Failed to delete exercise');
     }
   };
 
@@ -179,7 +209,6 @@ export default function ProfileSchedules() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <LoadingGif size={100} />
-        <Text style={{ color: '#fff', marginTop: 10 }}>Loading exercises...</Text>
       </View>
     );
   }
@@ -190,8 +219,8 @@ export default function ProfileSchedules() {
         <Text style={{ color: '#ff6b6b', textAlign: 'center', margin: 20 }}>
           {error}
         </Text>
-        <TouchableOpacity 
-          style={styles.saveButton} 
+        <TouchableOpacity
+          style={styles.saveButton}
           onPress={loadExercises}
         >
           <Text style={styles.saveButtonText}>Retry</Text>
@@ -200,9 +229,13 @@ export default function ProfileSchedules() {
     );
   }
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={styles.container}>
-      <ScrollView
+      <View style={{ height: statusBarHeight }} />
+      <Animated.ScrollView
+        style={{ opacity: fadeAnim }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         stickyHeaderIndices={[0]}
       >
@@ -280,7 +313,7 @@ export default function ProfileSchedules() {
         {filteredExercises.length === 0 && (
           <Text style={styles.noDataText}>No exercises found.</Text>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Floating Add Button */}
       <TouchableOpacity
@@ -291,69 +324,86 @@ export default function ProfileSchedules() {
           setForm({ name: "", description: "", videoUrl: "" });
         }}
       >
-        <AddCircleIcon size={40} color="#626161ff" />
+        <Text style={styles.addBtnText}>+</Text>
       </TouchableOpacity>
 
       {/* Add/Edit Exercise Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalHeader}>
-                {isEditing ? "Edit Exercise" : "Add Exercise"}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <CloseIcon size={28} color="white" />
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <ScrollView
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.modalBox}>
+                  <View style={styles.modalHeaderRow}>
+                    <Text style={styles.modalHeader}>
+                      {isEditing ? "Edit Exercise" : "Add Exercise"}
+                    </Text>
+                    <TouchableOpacity onPress={() => setModalVisible(false)}>
+                      <CloseIcon size={28} color="white" />
+                    </TouchableOpacity>
+                  </View>
 
-            <TextInput
-              placeholder="Exercise Name"
-              placeholderTextColor="#999"
-              style={styles.modalInput}
-              value={form.name}
-              onChangeText={(t) => setForm({ ...form, name: t })}
-            />
-            <TextInput
-              placeholder="YouTube Link"
-              placeholderTextColor="#999"
-              style={styles.modalInput}
-              value={form.videoUrl}
-              onChangeText={(t) => setForm({ ...form, videoUrl: t })}
-            />
-            <TextInput
-              placeholder="Description"
-              placeholderTextColor="#999"
-              style={[styles.modalInput, styles.textArea]}
-              value={form.description}
-              onChangeText={(t) => setForm({ ...form, description: t })}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
+                  <TextInput
+                    placeholder="Exercise Name"
+                    placeholderTextColor="#999"
+                    style={styles.modalInput}
+                    value={form.name}
+                    onChangeText={(t) => setForm({ ...form, name: t })}
+                  />
+                  <TextInput
+                    placeholder="YouTube Link"
+                    placeholderTextColor="#999"
+                    style={styles.modalInput}
+                    value={form.videoUrl}
+                    onChangeText={(t) => setForm({ ...form, videoUrl: t })}
+                  />
+                  <TextInput
+                    placeholder="Description"
+                    placeholderTextColor="#999"
+                    style={[styles.modalInput, styles.textArea]}
+                    value={form.description}
+                    onChangeText={(t) => setForm({ ...form, description: t })}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
 
-            <TouchableOpacity 
-              style={[styles.saveButton, saving && { opacity: 0.7 }]} 
-              onPress={addExercise}
-              disabled={saving}
-            >
-              {saving ? (
-                <LoadingGif size={40} />
-              ) : (
-                <Text style={styles.saveButtonText}>
-                  {isEditing ? "Update Exercise" : "Save Exercise"}
-                </Text>
-              )}
+                  <TouchableOpacity
+                    style={[styles.saveButton, saving && { opacity: 0.7 }]}
+                    onPress={addExercise}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>
+                        {isEditing ? "Update Exercise" : "Save Exercise"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Action Modal (Edit/Delete) */}
       <Modal visible={actionModalVisible} transparent animationType="fade">
         <View style={styles.modalContainer2}>
           <View style={styles.actionBox}>
- 
+
             <TouchableOpacity
               style={styles.optionButton}
               onPress={() => {
@@ -380,8 +430,8 @@ export default function ProfileSchedules() {
                   'Are you sure you want to delete this exercise?',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Delete', 
+                    {
+                      text: 'Delete',
                       style: 'destructive',
                       onPress: () => {
                         if (selectedExercise) deleteExercise(selectedExercise);
@@ -427,9 +477,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginBottom: 15,
   },
-  searchInput: { 
-    flex: 1, 
-    color: "#fff", 
+  searchInput: {
+    flex: 1,
+    color: "#fff",
     fontSize: 17,
     paddingVertical: 5,
   },
@@ -466,14 +516,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 100,
   },
+  addBtnText: {
+    fontSize: 40,
+    color: "black",
+    fontWeight: "300",
+  },
 
   // Modal styles
   modalContainer: {
     flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "flex-end",
   },
-    modalContainer2: {
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+  },
+  modalContainer2: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
@@ -514,18 +577,18 @@ const styles = StyleSheet.create({
   },
   saveButtonText: { fontSize: 18, fontWeight: "400", color: "#000" },
 
-   actionBox: {
+  actionBox: {
     backgroundColor: "#1c1c1c",
     padding: 20,
     margin: 40,
     borderRadius: 30,
     alignItems: "center",
-  }, 
+  },
   optionButton: {
     paddingVertical: 10,
     width: "100%",
     alignItems: "center",
-    },
+  },
   optionText: {
     fontSize: 18,
     color: "#a2a1a1ff",

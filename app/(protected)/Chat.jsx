@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Audio from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Animated,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,17 +20,19 @@ import {
   TouchableOpacity,
   View,
   Alert,
-  } from "react-native";
+} from "react-native";
 import EmojiPicker from "rn-emoji-keyboard";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import Logger from '../utils/logger';
 import ChatService from "../services/chatService";
 import { compressChatImage } from "../utils/imageCompression";
-import LoadingGif from '../components/LoadingGif';
+import { validateUserId, validateName, validateEmail, sanitizeString } from '../utils/validators';
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 export default function ChatScreen() {
   const { userId } = useLocalSearchParams();
+  const router = useRouter();
 
   const [userInfo, setUserInfo] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -40,14 +45,51 @@ export default function ChatScreen() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const soundRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const flatListRef = useRef(null);
 
   // fullscreen image
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const imageModalOpacity = useRef(new Animated.Value(0)).current;
+  const imageModalScale = useRef(new Animated.Value(0.8)).current;
 
   // delete modal
   const [deleteMsgId, setDeleteMsgId] = useState(null);
   const [failedImages, setFailedImages] = useState(new Set());
   const [lastImageUri, setLastImageUri] = useState(null);
+
+  // Animate image modal open/close
+  useEffect(() => {
+    if (fullscreenImage) {
+      // Open animation
+      Animated.parallel([
+        Animated.timing(imageModalOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(imageModalScale, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Reset for next open
+      imageModalOpacity.setValue(0);
+      imageModalScale.setValue(0.8);
+    }
+  }, [fullscreenImage]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      // Small delay to ensure FlatList has rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
 
   // Initialize chat service and load data
   useEffect(() => {
@@ -55,11 +97,19 @@ export default function ChatScreen() {
       if (!userId) return;
 
       try {
-        setLoading(true);
+        // Load cached messages immediately for instant display
+        const cachedMessages = await ChatService.getCachedMessages(userId);
+        if (cachedMessages.length > 0) {
+          const transformedCached = cachedMessages.map(msg => ChatService.transformMessage(msg));
+          setMessages(transformedCached);
+          setLoading(false); // Show cached messages immediately
+        }
 
-        // Load user information
-        const userResponse = await ApiService.getUserById(userId);
-        const profileResponse = await ApiService.getUserProfile(userId);
+        // Load user info and connect in parallel (background)
+        const [userResponse, profileResponse] = await Promise.all([
+          OfflineApiService.getUserById(userId),
+          OfflineApiService.getUserProfile(userId)
+        ]);
 
         if (userResponse.success) {
           const user = userResponse.user;
@@ -74,7 +124,7 @@ export default function ChatScreen() {
           });
         }
 
-        // Connect to chat service
+        // Connect to chat service in background
         setConnectionStatus('connecting');
         await ChatService.connect();
         setConnectionStatus('connected');
@@ -82,12 +132,12 @@ export default function ChatScreen() {
         // Set current chat user for polling
         ChatService.setCurrentChatUser(userId);
 
-        // Load chat history
+        // Load fresh chat history from server
         const chatHistory = await ChatService.getChatHistory(userId);
         if (chatHistory.success && chatHistory.data) {
           setChatId(chatHistory.data.chatId);
 
-          // Transform messages to match our UI format using ChatService helper
+          // Transform messages - preserve read status from database
           const transformedMessages = chatHistory.data.messages.map(msg =>
             ChatService.transformMessage(msg)
           );
@@ -98,14 +148,11 @@ export default function ChatScreen() {
           if (transformedMessages.length > 0) {
             ChatService.lastMessageTimestamp = transformedMessages[0].timestamp;
           }
-
-          Logger.info(`Admin loaded ${transformedMessages.length} messages ${chatHistory.fromCache ? '(from cache)' : '(from server)'}`);
         }
 
       } catch (error) {
         Logger.error('Error initializing chat:', error);
         setConnectionStatus('error');
-        Alert.alert('Connection Error', `Failed to connect to chat service: ${error.message}`);
 
         // Set default user info if loading fails
         setUserInfo({
@@ -165,21 +212,35 @@ export default function ChatScreen() {
 
     const handleMessageError = (data) => {
       setSending(false);
-      Alert.alert('Send Error', data.error || 'Failed to send message');
+      showAlert('Send Error', data.error || 'Failed to send message');
       // Remove failed optimistic messages
       setMessages(prev => prev.filter(msg => !msg.sending));
+    };
+
+    const handleMessageRead = (data) => {
+      Logger.log('📖 Message read receipt:', data);
+      // Mark messages as read
+      setMessages(prev => prev.map(msg => ({
+        ...msg,
+        read: true
+      })));
     };
 
     // Add event listeners
     ChatService.on('messageReceived', handleMessageReceived);
     ChatService.on('messageSent', handleMessageSent);
     ChatService.on('messageError', handleMessageError);
+    ChatService.on('messageRead', handleMessageRead);
+
+    // Emit that admin has opened the chat (mark messages as read)
+    ChatService.socket?.emit('markAsRead', { userId });
 
     // Cleanup listeners
     return () => {
       ChatService.off('messageReceived', handleMessageReceived);
       ChatService.off('messageSent', handleMessageSent);
       ChatService.off('messageError', handleMessageError);
+      ChatService.off('messageRead', handleMessageRead);
     };
   }, [userId]);
 
@@ -224,7 +285,7 @@ export default function ChatScreen() {
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setSending(false);
-      Alert.alert('Send Error', 'Failed to send message. Please try again.');
+      showAlert('Send Error', 'Failed to send message. Please try again.');
     }
   };
 
@@ -283,12 +344,12 @@ export default function ChatScreen() {
           setMessages(prev => prev.filter(msg => msg.id !== tempId));
           setSending(false);
           setLastImageUri(null);
-          Alert.alert('Send Error', 'Failed to send image. Please try again.');
+          showAlert('Send Error', 'Failed to send image. Please try again.');
         }
       }
     } catch (error) {
       Logger.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showAlert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -300,184 +361,299 @@ export default function ChatScreen() {
         setDeleteMsgId(null);
       } catch (error) {
         Logger.error('Error deleting message:', error);
-        Alert.alert('Delete Error', 'Failed to delete message. Please try again.');
+        showAlert('Delete Error', 'Failed to delete message. Please try again.');
         setDeleteMsgId(null);
       }
     }
   };
 
-  const renderItem = ({ item }) => {
+  // Helper function to format date like WhatsApp
+  const formatDateSeparator = (timestamp) => {
+    const messageDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Reset time to compare dates only
+    const resetTime = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const msgDate = resetTime(messageDate);
+    const todayDate = resetTime(today);
+    const yesterdayDate = resetTime(yesterday);
+
+    if (msgDate.getTime() === todayDate.getTime()) {
+      return 'Today';
+    } else if (msgDate.getTime() === yesterdayDate.getTime()) {
+      return 'Yesterday';
+    } else {
+      // Check if within last week
+      const daysDiff = Math.floor((todayDate - msgDate) / (1000 * 60 * 60 * 24));
+      if (daysDiff < 7) {
+        return messageDate.toLocaleDateString('en-US', { weekday: 'long' });
+      } else {
+        return messageDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+      }
+    }
+  };
+
+  // Check if we should show date separator
+  const shouldShowDateSeparator = (currentItem, index) => {
+    if (index === 0) return true;
+
+    const prevItem = messages[index - 1];
+    const currentDate = new Date(currentItem.timestamp).toDateString();
+    const prevDate = new Date(prevItem.timestamp).toDateString();
+
+    return currentDate !== prevDate;
+  };
+
+  const renderItem = ({ item, index }) => {
     const isMe = item.sender === "me";
+    const hasOnlyImage = item.image && !item.text;
+    const showDateSeparator = shouldShowDateSeparator(item, index);
+
     return (
-      <TouchableOpacity
-        onLongPress={() => !item.sending && setDeleteMsgId(item.id)}
-        delayLongPress={300}
-        activeOpacity={0.9}
-      >
-        <View
-          style={[
-            styles.messageContainer,
-            isMe ? styles.myMessage : styles.otherMessage,
-            item.sending && styles.sendingMessage
-          ]}
+      <>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <View style={styles.dateSeparatorLine} />
+            <Text style={styles.dateSeparatorText}>
+              {formatDateSeparator(item.timestamp)}
+            </Text>
+            <View style={styles.dateSeparatorLine} />
+          </View>
+        )}
+        <TouchableOpacity
+          onLongPress={() => !item.sending && setDeleteMsgId(item.id)}
+          delayLongPress={300}
+          activeOpacity={0.9}
+          style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', marginVertical: 6 }}
         >
-          {item.text && (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{
-                color: isMe ? "black" : "white",
-                fontSize: 16,
-                opacity: item.sending ? 0.7 : 1
-              }}>
-                {item.text}
-              </Text>
-              {item.sending && (
-                <ActivityIndicator
-                  size="small"
-                  color={isMe ? "black" : "white"}
-                  style={{ marginLeft: 8 }}
-                />
-              )}
-            </View>
-          )}
-
-          {item.image && (
-            <TouchableOpacity
-              onPress={() => {
-                Logger.debug('Image tapped:', item.image);
-                if (!item.sending) setFullscreenImage(item.image);
-              }}
-              disabled={item.sending}
-            >
-              {failedImages.has(item.id) ? (
-                <View style={{
-                  width: 200,
-                  height: 150,
-                  borderRadius: 10,
-                  backgroundColor: '#333',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginTop: item.text ? 5 : 0,
+          <View
+            style={[
+              !hasOnlyImage && styles.messageContainer,
+              !hasOnlyImage && (isMe ? styles.myMessage : styles.otherMessage),
+              item.sending && styles.sendingMessage
+            ]}
+          >
+            {item.text && (
+              <View>
+                <Text style={{
+                  color: isMe ? "black" : "white",
+                  fontSize: 16,
+                  opacity: item.sending ? 0.7 : 1,
+                  paddingRight: 50, // Space for timestamp
                 }}>
-                  <Ionicons name="image-outline" size={40} color="#666" />
-                  <Text style={{ color: '#666', fontSize: 12, marginTop: 5 }}>
-                    Image failed to load
+                  {item.text}
+                </Text>
+                <View style={styles.timestampContainer}>
+                  <Text style={[
+                    styles.timestamp,
+                    { color: isMe ? "#666" : "#aaa" }
+                  ]}>
+                    {new Date(item.timestamp).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })}
                   </Text>
+                  {isMe && !item.sending && (
+                    <Ionicons
+                      name={item.read ? "checkmark-done" : "checkmark"}
+                      size={16}
+                      color={item.read ? "#53bdeb" : "#666"}
+                      style={{ marginLeft: 4 }}
+                    />
+                  )}
+                  {item.sending && (
+                    <ActivityIndicator
+                      size="small"
+                      color={isMe ? "#666" : "#aaa"}
+                      style={{ marginLeft: 4 }}
+                    />
+                  )}
                 </View>
-              ) : (
-                <Image
-                  source={{ uri: item.image }}
-                  style={{
-                    maxWidth: 200,
-                    maxHeight: 200,
-                    minWidth: 100,
-                    minHeight: 100,
-                    borderRadius: 10,
-                    marginTop: item.text ? 5 : 0,
-                    opacity: item.sending ? 0.7 : 1
-                  }}
-                  resizeMode="contain" // Maintain aspect ratio
-                  onError={(error) => {
-                    Logger.failure('Image load error:', error);
-                    Logger.error('   Image URL:', item.image);
-                    setFailedImages(prev => new Set([...prev, item.id]));
-                  }}
-                  onLoad={() => {
-                    Logger.success('Image loaded successfully:', item.image);
-                    setFailedImages(prev => {
-                      const newSet = new Set(prev);
-                      newSet.delete(item.id);
-                      return newSet;
-                    });
-                  }}
-                />
-              )}
-              {item.sending && (
-                <View style={styles.sendingOverlay}>
-                  <LoadingGif size={24} />
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
+              </View>
+            )}
 
-          {item.audio && (
-            <TouchableOpacity
-              onPress={async () => {
-                if (item.sending) return;
-                if (soundRef.current) await soundRef.current.unloadAsync();
-                const { sound } = await Audio.Sound.createAsync({
-                  uri: item.audio,
-                });
-                soundRef.current = sound;
-                await sound.playAsync();
-              }}
-              style={{
-                marginTop: item.text || item.image ? 5 : 0,
-                flexDirection: 'row',
-                alignItems: 'center'
-              }}
-              disabled={item.sending}
-            >
-              <Ionicons
-                name="play-circle-outline"
-                size={32}
-                color={isMe ? "black" : "white"}
-                style={{ opacity: item.sending ? 0.7 : 1 }}
-              />
-              {item.sending && (
-                <ActivityIndicator
-                  size="small"
+            {item.image && (
+              <TouchableOpacity
+                onPress={() => {
+                  Logger.debug('Image tapped:', item.image);
+                  if (!item.sending) setFullscreenImage(item.image);
+                }}
+                disabled={item.sending}
+                style={{ marginTop: item.text ? 5 : 0 }}
+              >
+                {failedImages.has(item.id) ? (
+                  <View style={{
+                    width: 200,
+                    height: 150,
+                    borderRadius: 10,
+                    backgroundColor: '#333',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Ionicons name="image-outline" size={40} color="#666" />
+                    <Text style={{ color: '#666', fontSize: 12, marginTop: 5 }}>
+                      Image failed to load
+                    </Text>
+                  </View>
+                ) : (
+                  <Image
+                    source={{
+                      uri: item.image,
+                      cache: 'force-cache' // Enable aggressive caching
+                    }}
+                    style={{
+                      width: 200,
+                      height: 200,
+                      borderRadius: 10,
+                      opacity: item.sending ? 0.7 : 1
+                    }}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      Logger.failure('Image load error:', error);
+                      Logger.error('   Image URL:', item.image);
+                      setFailedImages(prev => new Set([...prev, item.id]));
+                    }}
+                    onLoad={() => {
+                      Logger.success('Image loaded successfully (cached):', item.image);
+                      setFailedImages(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(item.id);
+                        return newSet;
+                      });
+                    }}
+                  />
+                )}
+                {item.sending && (
+                  <View style={styles.sendingOverlay}>
+                    <ActivityIndicator size="large" color="#d5ff5f" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {/* Timestamp for image-only messages */}
+            {item.image && !item.text && (
+              <View style={[styles.timestampContainer, { marginTop: 4 }]}>
+                <Text style={[
+                  styles.timestamp,
+                  { color: isMe ? "#666" : "#aaa" }
+                ]}>
+                  {new Date(item.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                  })}
+                </Text>
+                {isMe && !item.sending && (
+                  <Ionicons
+                    name={item.read ? "checkmark-done" : "checkmark"}
+                    size={16}
+                    color={item.read ? "#53bdeb" : "#666"}
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+                {item.sending && (
+                  <ActivityIndicator
+                    size="small"
+                    color={isMe ? "#666" : "#aaa"}
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+              </View>
+            )}
+
+            {item.audio && (
+              <TouchableOpacity
+                onPress={async () => {
+                  if (item.sending) return;
+                  if (soundRef.current) await soundRef.current.unloadAsync();
+                  const { sound } = await Audio.Sound.createAsync({
+                    uri: item.audio,
+                  });
+                  soundRef.current = sound;
+                  await sound.playAsync();
+                }}
+                style={{
+                  marginTop: item.text || item.image ? 5 : 0,
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }}
+                disabled={item.sending}
+              >
+                <Ionicons
+                  name="play-circle-outline"
+                  size={32}
                   color={isMe ? "black" : "white"}
-                  style={{ marginLeft: 8 }}
+                  style={{ opacity: item.sending ? 0.7 : 1 }}
                 />
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
+                {item.sending && (
+                  <ActivityIndicator
+                    size="small"
+                    color={isMe ? "black" : "white"}
+                    style={{ marginLeft: 8 }}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </>
     );
   };
+
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#111" }}>
       <StatusBar barStyle="light-content" backgroundColor="#111" />
-
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
       >
         <View style={styles.container}>
+          <View style={{ height: statusBarHeight }} />
           {/* User info section */}
           <View style={styles.userInfo}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ marginRight: 12, padding: 4 }}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
             <Image
-              source={{ uri: userInfo?.avatar || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg" }}
+              source={{
+                uri: userInfo?.avatar || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
+                cache: 'force-cache'
+              }}
               style={styles.profilePic}
             />
             <View style={{ flex: 1 }}>
               <Text style={styles.username}>{userInfo?.name || "Loading..."}</Text>
-              <Text style={styles.status}>{userInfo?.status || "Unknown"}</Text>
-            </View>
-
-            {/* Connection status indicator */}
-            <View style={styles.connectionIndicator}>
-              <View style={[
-                styles.connectionDot,
-                connectionStatus === 'connected' && styles.connectedDot,
-                connectionStatus === 'connecting' && styles.connectingDot,
-                connectionStatus === 'error' && styles.errorDot
-              ]} />
-              <Text style={styles.connectionText}>
-                {connectionStatus === 'connected' ? 'Connected' :
-                  connectionStatus === 'connecting' ? 'Connecting...' :
-                    connectionStatus === 'error' ? 'Connection Error' : 'Disconnected'}
-              </Text>
+              {/* Connection status */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <View style={[
+                  styles.connectionDot,
+                  connectionStatus === 'connected' && styles.connectedDot,
+                  connectionStatus === 'connecting' && styles.connectingDot,
+                  connectionStatus === 'error' && styles.errorDot
+                ]} />
+                <Text style={styles.connectionText}>
+                  {connectionStatus === 'connected' ? 'Connected' :
+                    connectionStatus === 'connecting' ? 'Connecting...' :
+                      connectionStatus === 'error' ? 'Connection Error' : 'Disconnected'}
+                </Text>
+              </View>
             </View>
           </View>
 
           {/* Messages */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <LoadingGif size={100} />
+              <ActivityIndicator size="large" color="#d5ff5f" />
               <Text style={styles.loadingText}>Loading messages...</Text>
             </View>
           ) : messages.length === 0 ? (
@@ -488,12 +664,16 @@ export default function ChatScreen() {
           ) : (
             <View style={{ flex: 1 }}>
               <FlatList
+                ref={flatListRef}
                 data={messages}
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 style={styles.messagesList}
                 contentContainerStyle={{ paddingVertical: 10 }}
                 showsVerticalScrollIndicator={false}
+                keyboardDismissMode="on-drag"
+                keyboardShouldPersistTaps="handled"
+                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
               />
 
               {/* Typing indicator */}
@@ -517,6 +697,7 @@ export default function ChatScreen() {
                 placeholder="Type a message..."
                 placeholderTextColor="#999"
                 value={input}
+                maxLength={1000}
                 onChangeText={(text) => {
                   setInput(text);
 
@@ -542,7 +723,6 @@ export default function ChatScreen() {
                 }}
                 onSubmitEditing={sendMessage}
                 returnKeyType="send"
-                multiline={false}
                 editable={!sending}
               />
               <TouchableOpacity
@@ -559,7 +739,7 @@ export default function ChatScreen() {
               disabled={sending || !input.trim()}
             >
               {sending ? (
-                <LoadingGif size={24} />
+                <ActivityIndicator size="small" color="black" />
               ) : (
                 <Ionicons name="send" size={22} color="black" />
               )}
@@ -574,19 +754,38 @@ export default function ChatScreen() {
           />
 
           {/* Fullscreen Image Modal */}
-          <Modal visible={!!fullscreenImage} transparent={true}>
-            <View style={styles.fullscreenContainer}>
-              <Image
-                source={{ uri: fullscreenImage }}
-                style={styles.fullscreenImage}
-              />
+          <Modal visible={!!fullscreenImage} transparent={true} animationType="none">
+            <Animated.View
+              style={[
+                styles.fullscreenContainer,
+                { opacity: imageModalOpacity }
+              ]}
+            >
+              <Animated.View
+                style={{
+                  transform: [{ scale: imageModalScale }],
+                  width: '100%',
+                  height: '100%',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Image
+                  source={{
+                    uri: fullscreenImage,
+                    cache: 'force-cache'
+                  }}
+                  style={styles.fullscreenImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setFullscreenImage(null)}
               >
                 <Ionicons name="close" size={35} color="white" />
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           </Modal>
 
           {/* Delete Modal */}
@@ -714,9 +913,10 @@ const styles = StyleSheet.create({
   },
   messagesList: { flex: 1, paddingHorizontal: 12 },
   messageContainer: {
-    padding: 15,
-    borderRadius: 30,
-    marginVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    marginVertical: 4,
     maxWidth: "70%",
   },
   myMessage: { backgroundColor: "#d5ff5f", alignSelf: "flex-end" },
@@ -724,8 +924,8 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: "#222",
   },
   inputWrapper: { flex: 1, position: "relative", marginRight: 8 },
@@ -733,11 +933,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#333",
     color: "white",
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: 15,
     paddingRight: 40,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 10,
+    fontSize: 15,
   },
   emojiInside: {
     position: "absolute",
@@ -806,5 +1006,36 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginHorizontal: 5,
+  },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  timestamp: {
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingHorizontal: 20,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#333',
+  },
+  dateSeparatorText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
+    marginHorizontal: 12,
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
 });

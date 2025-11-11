@@ -25,7 +25,7 @@ const SkeletonBox = ({ width: boxWidth, height, style }) => {
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
+    outputRange: [0.5, 0.8],
   });
 
   return (
@@ -72,10 +72,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#000',
   },
   skeleton: {
-    backgroundColor: '#E1E9EE',
+    backgroundColor: '#2a2a2a',
     borderRadius: 8,
   },
   searchBar: {
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     marginBottom: 12,
   },

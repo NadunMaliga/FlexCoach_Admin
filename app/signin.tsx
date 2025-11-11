@@ -1,24 +1,28 @@
 import {
-    Poppins_300Light,
-    Poppins_400Regular,
-    Poppins_600SemiBold,
-    useFonts,
+  Poppins_300Light,
+  Poppins_400Regular,
+  Poppins_600SemiBold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
 import Logger from './utils/logger';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  StatusBar,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
 import apiService from "./services/api";
+import { validateUserId, validateName, validateEmail, sanitizeString } from './utils/validators';
+import HapticFeedback from './utils/haptics';
 
 export default function SignIn() {
   const router = useRouter();
@@ -67,20 +71,37 @@ export default function SignIn() {
   };
 
   const onSignIn = async () => {
+    // Validate and sanitize inputs
+    try {
+      const validatedEmail = validateEmail(form.email);
+      const sanitizedPassword = sanitizeString(form.password);
+    } catch (validationError) {
+      setErrors((prev) => ({
+        ...prev,
+        email: validationError.message,
+      }));
+      return;
+    }
     const e = validate(form);
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (Object.keys(e).length) {
+      HapticFeedback.error(); // Error haptic for validation failure
+      return;
+    }
 
     try {
+      HapticFeedback.light(); // Light tap on button press
       setSubmitting(true);
 
       // Call the backend API to authenticate
       const response = await apiService.login(form.password, form.email);
-      
+
       if (response.success) {
+        HapticFeedback.success(); // Success haptic on login
         // Login successful, navigate to verify/dashboard
         router.replace("/verify");
       } else {
+        HapticFeedback.error(); // Error haptic for login failure
         // Login failed
         setErrors((prev) => ({
           ...prev,
@@ -88,6 +109,7 @@ export default function SignIn() {
         }));
       }
     } catch (err) {
+      HapticFeedback.error(); // Error haptic for error
       Logger.error('Login error:', err);
       setErrors((prev) => ({
         ...prev,
@@ -101,8 +123,11 @@ export default function SignIn() {
   const isDisabled =
     submitting || !!Object.keys(errors).length || !form.email || !form.password;
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={styles.container}>
+      <View style={{ height: statusBarHeight }} />
       <Text style={styles.header}>Admin Sign In</Text>
       <Text style={styles.secondheader}>Welcome back</Text>
 
@@ -121,6 +146,8 @@ export default function SignIn() {
             <TextInput
               style={styles.input}
               placeholder="Email"
+              accessibilityLabel="Email address"
+              accessibilityHint="Enter your admin email address"
               placeholderTextColor="#dededeff"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -139,6 +166,8 @@ export default function SignIn() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              accessibilityLabel="Password"
+              accessibilityHint="Enter your admin password"
               placeholderTextColor="#dededeff"
               secureTextEntry={secure}
               autoCapitalize="none"
@@ -179,9 +208,11 @@ export default function SignIn() {
           onPress={onSignIn}
           disabled={isDisabled}
         >
-          <Text style={styles.nextButtonText}>
-            {submitting ? "Signing in..." : "Sign In"}
-          </Text>
+          {submitting ? (
+            <ActivityIndicator size="small" color="#d5ff5f" />
+          ) : (
+            <Text style={styles.nextButtonText}>Sign In</Text>
+          )}
         </TouchableOpacity>
 
         {/* Go to Sign Up (optional) */}
@@ -234,8 +265,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 25,
-    paddingVertical:20,
+    paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: "#171717ff",
   },

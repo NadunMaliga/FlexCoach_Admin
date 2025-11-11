@@ -1,0 +1,989 @@
+{
+  "timestamp": "2025-11-09T11:46:50.697Z",
+  "score": 69,
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "medium": 12,
+    "low": 2,
+    "ux": 83,
+    "improvements": 78,
+    "total": 15
+  },
+  "issues": {
+    "critical": [],
+    "high": [
+      {
+        "file": "services/chatService.js",
+        "issue": "2 console.log statements with potentially sensitive data",
+        "recommendation": "Use Logger utility instead and ensure sensitive data is redacted"
+      }
+    ],
+    "medium": [
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "TextInput without apparent validation",
+        "recommendation": "Add input validation using validators.js"
+      },
+      {
+        "file": "config/environment.js",
+        "issue": "Insecure HTTP URL: 'http://172.28.26.234:3001'",
+        "recommendation": "Use HTTPS for all external URLs"
+      },
+      {
+        "file": "config/environment.js",
+        "issue": "Insecure HTTP URL: 'http://172.28.26.234:5000'",
+        "recommendation": "Use HTTPS for all external URLs"
+      },
+      {
+        "file": "contexts/AuthContext.tsx",
+        "issue": "No token expiration handling",
+        "recommendation": "Implement token refresh or expiration checks"
+      }
+    ],
+    "low": [
+      {
+        "file": "SplashScreen.tsx",
+        "issue": "Component without ErrorBoundary",
+        "recommendation": "Wrap components in ErrorBoundary for better error handling"
+      },
+      {
+        "file": "services/api.js",
+        "issue": "No retry logic for failed requests",
+        "recommendation": "Implement retry mechanism for network failures"
+      }
+    ],
+    "ux": [
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/DietHistory.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/DietHistory.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/DietHistory.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/DietPlan.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/DietPlan.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/DietPlan.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "(protected)/Home.tsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "(protected)/Home.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "(protected)/ProfileSchedules.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "(protected)/ProfileSchedules.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "(protected)/ProfileSchedules.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "Alert.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "TextInput without keyboard handling",
+        "impact": "Keyboard may cover input fields",
+        "recommendation": "Wrap in KeyboardAvoidingView"
+      },
+      {
+        "file": "components/ApiTest.jsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "components/ApiTest.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "components/ApiTest.jsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "components/ClientsSkeleton.jsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "components/DashboardSkeleton.jsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "components/DietPlanTest.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "components/ErrorBoundary.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "components/Header.jsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "components/ListSkeleton.jsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "config/environment.js",
+        "issue": "API call without loading state",
+        "impact": "Users do not know when data is being fetched",
+        "recommendation": "Add loading indicators (LoadingGif component)"
+      },
+      {
+        "file": "index.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "services/api.js",
+        "issue": "6 hardcoded strings",
+        "impact": "Difficult to internationalize",
+        "recommendation": "Consider using i18n for text content"
+      },
+      {
+        "file": "signin.tsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "signin.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "signin.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "signin.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      },
+      {
+        "file": "utils/imageCompression.js",
+        "issue": "API call without loading state",
+        "impact": "Users do not know when data is being fetched",
+        "recommendation": "Add loading indicators (LoadingGif component)"
+      },
+      {
+        "file": "utils/secureId.js",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "verify.tsx",
+        "issue": "List without empty state",
+        "impact": "Confusing when no data is available",
+        "recommendation": "Add EmptyState component"
+      },
+      {
+        "file": "verify.tsx",
+        "issue": "Interactive elements without accessibility labels",
+        "impact": "Poor accessibility for screen readers",
+        "recommendation": "Add accessibilityLabel and accessibilityHint"
+      },
+      {
+        "file": "verify.tsx",
+        "issue": "Inline styles detected",
+        "impact": "Performance impact and harder to maintain",
+        "recommendation": "Use StyleSheet.create() for better performance"
+      },
+      {
+        "file": "verify.tsx",
+        "issue": "List without pull-to-refresh",
+        "impact": "Users cannot manually refresh data",
+        "recommendation": "Add RefreshControl component"
+      }
+    ],
+    "improvements": [
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Large file (569 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/AddDiet.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Large file (707 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/AddSchedule.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Large file (810 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/Chat.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/ClientBodyImage.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Large file (663 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/ClientProfile.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/Clients.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "Using \"any\" type",
+        "recommendation": "Define proper TypeScript interfaces"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/Dashboard.tsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/DietHistory.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/DietHistory.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/DietPlan.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/DietPlan.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "Large file (534 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/Exercise.tsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Large file (772 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/ExercisePlan.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "Large file (545 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/Foods.tsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/Home.tsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "(protected)/MeasurementHistory.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "(protected)/ProfileSchedules.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "(protected)/ProfileSchedules.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "AddSchedule.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "Alert.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "Chat.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "Nested map() calls",
+        "recommendation": "Optimize nested loops for better performance"
+      },
+      {
+        "file": "Foods.tsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "components/ApiTest.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ApiTest.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "components/ClientsSkeleton.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ClientsSkeleton.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "components/DashboardSkeleton.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/DashboardSkeleton.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "components/DietPlanTest.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/EmptyState.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ErrorBoundary.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/Header.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ListSkeleton.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ListSkeleton.jsx",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "components/LoadingGif.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/LoadingOverlay.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/ProfileAvatar.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "components/Toast.jsx",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "config/environment.js",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "services/api.js",
+        "issue": "Large file (697 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "services/api.js",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "services/chatService.js",
+        "issue": "Large file (596 lines)",
+        "recommendation": "Consider splitting into smaller components"
+      },
+      {
+        "file": "services/chatService.js",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "services/chatService.js",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      },
+      {
+        "file": "utils/logger.js",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "utils/logger.js",
+        "issue": "2 TODO/FIXME comments",
+        "recommendation": "Address pending tasks"
+      },
+      {
+        "file": "utils/profilePicture.js",
+        "issue": "Component without prop validation",
+        "recommendation": "Add PropTypes or convert to TypeScript"
+      },
+      {
+        "file": "utils/secureId.js",
+        "issue": "Array operations without memoization",
+        "recommendation": "Consider using useMemo for expensive computations"
+      }
+    ]
+  }
+}

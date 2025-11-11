@@ -1,14 +1,14 @@
 import {
-  Alert,
 Poppins_400Regular,
     Poppins_500Medium,
     useFonts,
 } from "@expo-google-fonts/poppins";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
     ActivityIndicator,
+    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -18,17 +18,36 @@ import {
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
-import LoadingGif from '../components/LoadingGif';
+import OfflineApiService from "../services/OfflineApiService";
+import ListSkeleton from '../components/ListSkeleton';
+import { Feather } from "@expo/vector-icons";
+import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 export default function DietPlan() {
     const [selectedMeal, setSelectedMeal] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [meals, setMeals] = useState([]);
     const router = useRouter();
-    const { userId } = useLocalSearchParams();
+    const { userId, preloadedData: preloadedDataParam } = useLocalSearchParams();
+
+    // Parse preloaded data if available - memoized to prevent re-parsing
+    const preloadedData = useMemo(() => {
+        if (preloadedDataParam) {
+            try {
+                const parsed = JSON.parse(preloadedDataParam);
+                Logger.log('🚀 Using preloaded diet data:', parsed?.length || 0, 'items');
+                return parsed;
+            } catch (e) {
+                Logger.error('Error parsing preloaded data:', e);
+                return null;
+            }
+        }
+        return null;
+    }, [preloadedDataParam]);
+
+    const [loading, setLoading] = useState(!preloadedData);
+    const [meals, setMeals] = useState(preloadedData || []);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(!!preloadedData);
 
     // Use the passed userId or fallback to test user ID for development
     const effectiveUserId = userId || "68e8fd08e8d1859ebd9edd05";
@@ -42,13 +61,25 @@ export default function DietPlan() {
         Poppins_500Medium,
     });
 
+    // Handle initial load - only load if no preloaded data
+    useEffect(() => {
+        if (preloadedData && preloadedData.length > 0) {
+            Logger.log('✅ Preloaded diet data ready - skipping initial API call');
+            setHasLoadedOnce(true);
+            setLoading(false);
+        } else if (!hasLoadedOnce) {
+            // Only load if we haven't loaded before and no preloaded data
+            loadDietPlans();
+        }
+    }, [preloadedData]);
+
     // Fetch diet plans from backend
     const loadDietPlans = useCallback(async () => {
         try {
             setLoading(true);
             Logger.log('Loading diet plans for userId:', effectiveUserId);
 
-            const response = await ApiService.getUserDietPlans(effectiveUserId);
+            const response = await OfflineApiService.getUserDietPlans(effectiveUserId);
             Logger.log('API response:', response);
 
             if (response.success && response.dietPlans && response.dietPlans.length > 0) {
@@ -73,6 +104,7 @@ export default function DietPlan() {
                     });
 
                     return {
+                        _id: dietPlan._id, // Include ID for editing
                         name: dietPlan.name || `Meal ${index + 1}`,
                         details: mealDetails
                     };
@@ -93,13 +125,16 @@ export default function DietPlan() {
         }
     }, [effectiveUserId]);
 
-    // Refresh data when screen comes into focus
+    // Refresh data when screen comes into focus (e.g., after editing a diet)
+    // Refresh data when screen comes into focus (e.g., after adding a diet)
+    // But skip the first focus if we have preloaded data
     useFocusEffect(
         useCallback(() => {
-            if (effectiveUserId) {
+            if (effectiveUserId && hasLoadedOnce) {
+                Logger.log('🔄 DietPlan focused - refreshing data');
                 loadDietPlans();
             }
-        }, [effectiveUserId, loadDietPlans])
+        }, [effectiveUserId, loadDietPlans, hasLoadedOnce])
     );
 
     if (!fontsLoaded) return null;
@@ -109,13 +144,11 @@ export default function DietPlan() {
         setModalVisible(true);
     };
 
-    if (loading) {
+    // Only show loading if we're actually loading and don't have preloaded data or existing meals
+    if (loading && meals.length === 0) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <LoadingGif size={80} />
-                <Text style={{ color: '#fff', marginTop: 10, fontFamily: "Poppins_400Regular" }}>
-                    Loading diet plans...
-                </Text>
+            <View style={styles.container}>
+                <ListSkeleton count={6} />
             </View>
         );
     }
@@ -137,8 +170,11 @@ export default function DietPlan() {
                 {/* Meals List */}
                 {meals.length > 0 ? (
                     meals.map((meal, index) => (
-                        <TouchableOpacity key={index} onPress={() => openMealModal(meal)}>
-                            <View style={styles.card}>
+                        <View key={index} style={styles.card}>
+                            <TouchableOpacity 
+                                style={styles.cardTouchable}
+                                onPress={() => openMealModal(meal)}
+                            >
                                 <View style={styles.iconWrapper}>
                                     <Svg
                                         width={30}
@@ -170,8 +206,27 @@ export default function DietPlan() {
                                 >
                                     <Path d="M9 18l6-6-6-6" />
                                 </Svg>
-                            </View>
-                        </TouchableOpacity>
+                            </TouchableOpacity>
+                            {/* Edit Button */}
+                            <TouchableOpacity
+                                style={styles.editButton}
+                                onPress={() => {
+                                    if (meal._id) {
+                                        Logger.log('Editing diet plan with ID:', meal._id);
+                                        router.push(`/AddDiet?userId=${effectiveUserId}&dietId=${meal._id}&mode=edit`);
+                                    } else {
+                                        Logger.error('No diet ID found for meal:', meal);
+                                        Alert.alert(
+                                            'Cannot Edit',
+                                            'This diet plan cannot be edited because it has no ID.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }
+                                }}
+                            >
+                                <Feather name="edit-2" size={18} color="#d5ff5f" />
+                            </TouchableOpacity>
+                        </View>
                     ))
                 ) : (
                     <View style={styles.emptyState}>
@@ -259,9 +314,27 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "#1c1c1c",
         borderRadius: 50,
-        padding: 17,
         marginBottom: 15,
+        position: "relative",
+    },
+    cardTouchable: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 17,
+        paddingRight: 60, // Make room for edit button
+        flex: 1,
         justifyContent: "space-between",
+    },
+    editButton: {
+        position: "absolute",
+        right: 15,
+        top: "50%",
+        transform: [{ translateY: -12 }],
+        padding: 8,
+        backgroundColor: "#2a2a2a",
+        borderRadius: 20,
+        justifyContent: "center",
+        alignItems: "center",
     },
     iconWrapper: {
         backgroundColor: "#3a3a3aff",

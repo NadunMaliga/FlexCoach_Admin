@@ -1,17 +1,19 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Platform,
+  StatusBar,
 } from "react-native";
 import Logger from '../utils/logger';
 import Svg, { Path } from "react-native-svg";
-import ApiService from "../services/api";
+import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
 
 
@@ -90,7 +92,7 @@ const getIconComponent = (iconName) => {
 const router = useRouter();
 
 export default function ClientProfile() {
-  const { userId, user: userParam } = useLocalSearchParams();
+  const { userId, user: userParam, preloadedExerciseData, preloadedDietData } = useLocalSearchParams();
   const [user, setUser] = useState(null);
   const [latestMeasurements, setLatestMeasurements] = useState({});
   const [onboardingData, setOnboardingData] = useState(null);
@@ -100,40 +102,122 @@ export default function ClientProfile() {
   const [activeTab, setActiveTab] = useState("Personal");
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Preloaded data for instant tab switching
+  const [exerciseData, setExerciseData] = useState(null);
+  const [dietData, setDietData] = useState(null);
+  const [dataPreloaded, setDataPreloaded] = useState(false);
+
+  // Initialize with preloaded data if available
+  useEffect(() => {
+    if (preloadedExerciseData) {
+      try {
+        const parsed = JSON.parse(preloadedExerciseData);
+        setExerciseData(parsed);
+        setDataPreloaded(true);
+        Logger.log('✅ Using preloaded exercise data from navigation:', parsed.length, 'items');
+      } catch (e) {
+        Logger.error('Error parsing preloaded exercise data:', e);
+      }
+    }
+    
+    if (preloadedDietData) {
+      try {
+        const parsed = JSON.parse(preloadedDietData);
+        setDietData(parsed);
+        setDataPreloaded(true);
+        Logger.log('✅ Using preloaded diet data from navigation:', parsed.length, 'items');
+      } catch (e) {
+        Logger.error('Error parsing preloaded diet data:', e);
+      }
+    }
+  }, [preloadedExerciseData, preloadedDietData]);
+
   useEffect(() => {
     loadUserData();
   }, [userId]);
 
+  // Preload exercise and diet data for instant tab switching
+  const preloadTabData = async (userId) => {
+    try {
+      Logger.log('🚀 Preloading tab data for user:', userId);
+
+      // Fetch all tab data in parallel
+      const [exerciseResponse, dietResponse] = await Promise.all([
+        OfflineApiService.getUserWorkoutSchedules(userId).catch(err => ({ success: false, error: err.message })),
+        OfflineApiService.getUserDietPlans(userId).catch(err => ({ success: false, error: err.message }))
+      ]);
+
+      // Store preloaded data for exercise
+      if (exerciseResponse.success && exerciseResponse.schedules) {
+        setExerciseData(exerciseResponse.schedules || []);
+        Logger.log('✅ Exercise data preloaded:', exerciseResponse.schedules?.length || 0, 'items');
+      }
+
+      // Store preloaded data for diet - transform it to match the UI format
+      if (dietResponse.success && dietResponse.dietPlans) {
+        const transformedMeals = dietResponse.dietPlans.map((dietPlan, index) => {
+          const mealDetails = {};
+
+          dietPlan.meals.forEach(meal => {
+            const foodList = meal.foods.map(food => {
+              let displayText;
+              if (food.unit && food.unit !== 'serving' && food.unit !== '') {
+                displayText = `${food.foodName} ${food.quantity} ${food.unit}`;
+              } else {
+                displayText = `${food.foodName} ${food.quantity}`;
+              }
+              return displayText;
+            }).join('\n');
+
+            mealDetails[meal.time] = foodList || meal.instructions || `${meal.name} - ${meal.totalCalories} calories`;
+          });
+
+          return {
+            _id: dietPlan._id, // Include ID for editing
+            name: dietPlan.name || `Meal ${index + 1}`,
+            details: mealDetails
+          };
+        });
+
+        setDietData(transformedMeals);
+        Logger.log('✅ Diet data preloaded:', transformedMeals.length, 'items');
+      }
+
+      setDataPreloaded(true);
+      Logger.log('🎉 All tab data preloaded successfully!');
+    } catch (error) {
+      Logger.error('❌ Error preloading tab data:', error);
+    }
+  };
+
   const loadUserData = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      // Try to parse user from params first
+      // Try to parse user from params first for instant display
       if (userParam) {
         try {
           const parsedUser = JSON.parse(userParam);
           setUser(parsedUser);
+
+          // Set profile photo immediately if available
+          if (parsedUser.profilePhoto) {
+            setUserProfile({ profilePhoto: parsedUser.profilePhoto });
+          }
+
+          setLoading(false); // Show UI immediately with cached data
         } catch (e) {
           Logger.error('Error parsing user param:', e);
         }
       }
 
-      // Load fresh user data and measurements if userId is available
-      if (userId) {
-        const [userResponse, measurementsResponse, onboardingResponse, userProfileResponse] = await Promise.all([
-          ApiService.getUserById(userId),
-          ApiService.getUserLatestMeasurements(userId),
-          ApiService.getUserOnboarding(userId),
-          ApiService.getUserProfile(userId).catch(err => {
-            Logger.log('User profile not found:', err.message);
-            return { success: false };
-          })
-        ]);
+      setError(null);
 
-        if (userResponse.success) {
-          setUser(userResponse.user);
-        }
+      // Load essential data first
+      if (userId) {
+        // Fetch measurements and onboarding data
+        const [measurementsResponse, onboardingResponse] = await Promise.all([
+          OfflineApiService.getUserLatestMeasurements(userId),
+          OfflineApiService.getUserOnboarding(userId)
+        ]);
 
         if (measurementsResponse.success) {
           setLatestMeasurements(measurementsResponse.latestMeasurements);
@@ -143,10 +227,8 @@ export default function ClientProfile() {
           setOnboardingData(onboardingResponse.onboarding);
         }
 
-        if (userProfileResponse.success) {
-          setUserProfile(userProfileResponse.userProfile);
-          Logger.log('📸 User profile loaded:', userProfileResponse.userProfile.profilePhoto);
-        }
+        // Preload tab data in background for instant tab switching
+        preloadTabData(userId);
       }
     } catch (err) {
       Logger.error('Load user data error:', err);
@@ -160,7 +242,6 @@ export default function ClientProfile() {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
         <LoadingGif size={100} />
-        <Text style={{ color: '#fff', marginTop: 10 }}>Loading profile...</Text>
       </View>
     );
   }
@@ -198,29 +279,36 @@ export default function ClientProfile() {
     router.push(`/MeasurementHistory?measurement=${key}&userId=${userId}`);
   };
 
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ alignItems: "center", paddingBottom: 80 }}>
-        {/* Profile Image */}
-        <Image
-          source={{
-            uri: userProfile?.profilePhoto || user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg"
-          }}
-          style={styles.profilePic}
-          onLoad={() => Logger.success('Profile image loaded:', userProfile?.profilePhoto || user.profilePhoto)}
-          onError={(error) => Logger.log('❌ Profile image error:', error.nativeEvent.error)}
-        />
+      <View style={{ height: statusBarHeight }} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+        {/* Profile Header - Centered */}
+        <View style={{ alignItems: 'center', width: '100%' }}>
+          {/* Profile Image */}
+          <Image
+            source={{
+              uri: userProfile?.profilePhoto || user.profilePhoto || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
+              cache: 'force-cache'
+            }}
+            style={styles.profilePic}
+            onLoad={() => Logger.success('Profile image loaded:', userProfile?.profilePhoto || user.profilePhoto)}
+            onError={(error) => Logger.log('❌ Profile image error:', error.nativeEvent.error)}
+          />
 
-        {/* Name */}
-        <Text style={styles.name} numberOfLines={1}>
-          {`${user.firstName} ${user.lastName}`}
-        </Text>
-        <Text style={styles.subInfo}>
-          Age: {calculateAge(user.birthday)}, Weight: {latestMeasurements.Weight?.value || 'N/A'} {latestMeasurements.Weight?.unit || ''}
-        </Text>
-        <Text style={styles.goal}>
-          Training Mode: {user.trainingMode || 'N/A'}
-        </Text>
+          {/* Name */}
+          <Text style={styles.name} numberOfLines={1}>
+            {`${user.firstName} ${user.lastName}`}
+          </Text>
+          <Text style={styles.subInfo}>
+            Age: {calculateAge(user.birthday)}, Weight: {latestMeasurements.Weight?.value || 'N/A'} {latestMeasurements.Weight?.unit || ''}
+          </Text>
+          <Text style={styles.goal}>
+            Training Mode: {user.trainingMode || 'N/A'}
+          </Text>
+        </View>
 
         {/* Tabs */}
         <View style={styles.tabRow}>
@@ -231,10 +319,26 @@ export default function ClientProfile() {
               onPress={() => {
                 if (tab === "Exercise") {
                   Logger.log('Navigating to ExercisePlan with userId:', userId);
-                  router.push(`/ExercisePlan?userId=${userId}`);
+                  // Pass preloaded data if available
+                  const params = { userId };
+                  if (dataPreloaded && exerciseData) {
+                    params.preloadedData = JSON.stringify(exerciseData);
+                  }
+                  router.push({
+                    pathname: '/ExercisePlan',
+                    params
+                  });
                 } else if (tab === "Diet Plan") {
                   Logger.log('Navigating to DietPlan with userId:', userId);
-                  router.push(`/DietPlan?userId=${userId}`);
+                  // Pass preloaded data if available
+                  const params = { userId };
+                  if (dataPreloaded && dietData) {
+                    params.preloadedData = JSON.stringify(dietData);
+                  }
+                  router.push({
+                    pathname: '/DietPlan',
+                    params
+                  });
                 } else {
                   setActiveTab(tab);
                 }
@@ -252,8 +356,8 @@ export default function ClientProfile() {
           ))}
         </View>
 
-        {/* Tab Content */}
-        {activeTab === "Personal" && (
+        {/* Tab Content - All tabs stay mounted for better performance */}
+        <View style={activeTab === "Personal" ? styles.visible : styles.hidden}>
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
             {[
@@ -277,25 +381,25 @@ export default function ClientProfile() {
               </View>
             ))}
           </View>
-        )}
+        </View>
 
-        {activeTab === "Exercise" && (
+        <View style={activeTab === "Exercise" ? styles.visible : styles.hidden}>
           <View style={styles.placeholderBox}>
             <Text style={styles.placeholderText}>
               Exercise Plan will appear here
             </Text>
           </View>
-        )}
+        </View>
 
-        {activeTab === "Diet Plan" && (
+        <View style={activeTab === "Diet Plan" ? styles.visible : styles.hidden}>
           <View style={styles.placeholderBox}>
             <Text style={styles.placeholderText}>
               Diet Plan will appear here
             </Text>
           </View>
-        )}
+        </View>
 
-        {activeTab === "Details" && (
+        <View style={activeTab === "Details" ? styles.visible : styles.hidden}>
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>User Details</Text>
             {[
@@ -360,7 +464,7 @@ export default function ClientProfile() {
               </View>
             )}
           </View>
-        )}
+        </View>
       </ScrollView>
 
 
@@ -377,7 +481,7 @@ export default function ClientProfile() {
 
       <TouchableOpacity
         style={styles.chatButton}
-        onPress={() => router.push("/Chat")} // navigate to Chat page
+        onPress={() => router.push(`/Chat?userId=${userId}`)} // navigate to Chat page with userId
       >
         <Svg width={25} height={25} viewBox="0 0 24 24" fill="none" stroke="#707070ff" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M21 15C21 16.6569 19.6569 18 18 18H7L3 22V4C3 2.34315 4.34315 1 6 1H18C19.6569 1 21 2.34315 21 4V15Z" />
@@ -499,6 +603,8 @@ export default function ClientProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black", paddingTop: 3, paddingBottom: 60, },
+  visible: { flex: 1 },
+  hidden: { flex: 1, position: 'absolute', left: -9999 },
   profilePic: {
     width: 180,
     height: 180,
@@ -536,7 +642,11 @@ const styles = StyleSheet.create({
   tabText: { color: "gray", fontSize: 16, fontFamily: "Poppins_400Regular" },
   tabTextActive: { color: "#dddadaff", fontWeight: "600" },
 
-  infoSection: { width: "85%", marginTop: 10 },
+  infoSection: {
+    width: "100%",
+    paddingHorizontal: 20,
+    marginTop: 10
+  },
   sectionTitle: {
     color: "#e4e4e4",
     fontSize: 18,
@@ -544,7 +654,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 20,
   },
-  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
+  infoRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 15 },
   iconBox: {
     width: 60,
     height: 60,
@@ -554,9 +664,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-  textBox: { flexDirection: "column" },
-  infoLabel: { color: "#c4c4c4", fontSize: 17 },
-  infoValue: { color: "gray", fontSize: 14 },
+  textBox: {
+    flexDirection: "column",
+  },
+  infoLabel: {
+    color: "#c4c4c4",
+    fontSize: 17,
+  },
+  infoValue: {
+    color: "gray",
+    fontSize: 14,
+  },
 
   placeholderBox: { marginTop: 40, alignItems: "center" },
   placeholderText: { color: "gray", fontSize: 15, fontFamily: "Poppins_400Regular" },
@@ -593,6 +711,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#d5ff5f",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 25,
     paddingVertical: 20,
     borderTopWidth: 1,

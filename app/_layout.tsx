@@ -1,16 +1,32 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { StatusBar } from 'react-native';
 import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import OfflineIndicator from './components/OfflineIndicator';
+import AlertProvider from './components/AlertProvider';
+import BackgroundSyncManager from './services/BackgroundSyncManager';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Initialize background sync and notifications
+    BackgroundSyncManager.initialize();
+    
+    // Set status bar style for Android
+    StatusBar.setBarStyle('light-content');
+    StatusBar.setBackgroundColor('#000000');
+  }, []);
+
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <AlertProvider>
+        <AuthProvider>
         <Stack screenOptions={{ 
         headerShown: true,
         headerStyle: { backgroundColor: '#000' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+        contentStyle: { backgroundColor: '#000' },
       }}>
         <Stack.Screen 
           name="index" 
@@ -20,14 +36,14 @@ export default function RootLayout() {
           name="signin" 
           options={{ 
             title: 'Sign In',
-            headerShown: true 
+            headerShown: false 
           }} 
         />
         <Stack.Screen 
           name="verify" 
           options={{ 
             title: 'Verify Account',
-            headerShown: true 
+            headerShown: false 
           }} 
         />
         <Stack.Screen 
@@ -48,7 +64,9 @@ export default function RootLayout() {
           options={{ headerShown: false }} 
         />
       </Stack>
-      </AuthProvider>
+      <OfflineIndicator />
+        </AuthProvider>
+      </AlertProvider>
     </ErrorBoundary>
   );
 }

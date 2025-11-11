@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import Svg, { Path } from "react-native-svg";
-import ApiService from '../services/api';
+import OfflineApiService from "../services/OfflineApiService";
 import Logger from '../utils/logger';
 import LoadingGif from '../components/LoadingGif';
 
@@ -37,7 +37,7 @@ export default function MeasurementHistory() {
             setLoading(true);
             setError(null);
             
-            const response = await ApiService.getUserBodyMeasurements(userId);
+            const response = await OfflineApiService.getUserBodyMeasurements(userId);
             
             if (response.success) {
                 setMeasurements(response.measurements || []);
@@ -100,7 +100,6 @@ export default function MeasurementHistory() {
         return (
             <View style={[styles.container, styles.centered]}>
                 <LoadingGif size={100} />
-                <Text style={styles.loadingText}>Loading measurements...</Text>
             </View>
         );
     }

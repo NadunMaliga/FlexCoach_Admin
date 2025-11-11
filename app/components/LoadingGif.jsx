@@ -9,7 +9,6 @@ export default function LoadingGif({ message = "Loading...", size = 150 }) {
         style={[styles.gif, { width: size, height: size }]}
         resizeMode="contain"
       />
-      {message && <Text style={styles.message}>{message}</Text>}
     </View>
   );
 }

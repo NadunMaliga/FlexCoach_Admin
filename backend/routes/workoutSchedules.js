@@ -340,11 +340,120 @@ router.post('/', [
 });
 
 // Update workout schedule (admin only)
-router.put('/:id', async (req, res) => {
+router.put('/:id', [
+  body('name').optional().notEmpty().trim().withMessage('Workout schedule name cannot be empty'),
+  body('userId').optional().isMongoId().withMessage('Valid user ID is required'),
+  body('day').optional().isIn(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).withMessage('Valid day is required'),
+  body('dayNumber').optional().isInt({ min: 1, max: 999 }).withMessage('Day number must be between 1 and 999'),
+  body('workoutType').optional().isIn(['Strength', 'Cardio', 'HIIT', 'Flexibility', 'Mixed']).withMessage('Valid workout type is required'),
+  body('exercises').optional().isArray().withMessage('Exercises must be an array')
+], async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.error('Validation errors:', errors.array());
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    console.log('Updating workout schedule with data:', JSON.stringify(req.body, null, 2));
+
+    // Validate workout schedule ID
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid workout schedule ID'
+      });
+    }
+
+    // Connect to flexcoach database to get exercise names
+    const flexcoachDb = mongoose.connection.useDb('flexcoach');
+    const ExercisesCollection = flexcoachDb.collection('exercises');
+
+    // Process exercises and fetch complete details including video URLs from exercise collection
+    const processedExercises = [];
+    
+    if (req.body.exercises && Array.isArray(req.body.exercises)) {
+      for (const exercise of req.body.exercises) {
+        let exerciseName = exercise.exerciseName || 'Unknown Exercise';
+        let exerciseId = exercise.exercise;
+        let videoUrl = null;
+        let description = null;
+        let category = null;
+        let difficulty = null;
+        
+        console.log('Processing exercise:', exercise);
+        
+        // If exercise ID is provided and valid, fetch complete details from the exercise collection
+        if (exercise.exercise && mongoose.Types.ObjectId.isValid(exercise.exercise)) {
+          try {
+            const exerciseDoc = await ExercisesCollection.findOne({
+              _id: new mongoose.Types.ObjectId(exercise.exercise)
+            });
+            
+            if (exerciseDoc) {
+              exerciseName = exerciseDoc.name;
+              videoUrl = exerciseDoc.videoUrl;
+              description = exerciseDoc.description;
+              category = exerciseDoc.category;
+              difficulty = exerciseDoc.difficulty;
+              console.log('Found exercise details:', {
+                name: exerciseName,
+                videoUrl: videoUrl,
+                category: category,
+                difficulty: difficulty
+              });
+            }
+          } catch (exerciseError) {
+            console.log('Could not fetch exercise details for ID:', exercise.exercise, exerciseError.message);
+          }
+        } else if (exercise.exercise && exercise.exercise.startsWith('mock_')) {
+          // Handle mock exercises - don't set exercise ID for these
+          exerciseId = null;
+          // Use a default name mapping for mock exercises with mock video URLs
+          const mockExerciseData = {
+            'mock_1': { name: 'Push Ups', videoUrl: 'https://www.youtube.com/watch?v=IODxDxX7oi4' },
+            'mock_2': { name: 'Squats', videoUrl: 'https://www.youtube.com/watch?v=aclHkVaku9U' },
+            'mock_3': { name: 'Bench Press', videoUrl: 'https://www.youtube.com/watch?v=rT7DgCr-3pg' },
+            'mock_4': { name: 'Deadlift', videoUrl: 'https://www.youtube.com/watch?v=ytGaGIn3SjE' },
+            'mock_5': { name: 'Bicep Curls', videoUrl: 'https://www.youtube.com/watch?v=ykJmrZ5v0Oo' },
+            'mock_6': { name: 'Plank', videoUrl: 'https://www.youtube.com/watch?v=ASdvN_XEl_c' }
+          };
+          const mockData = mockExerciseData[exercise.exercise] || { name: 'Unknown Exercise', videoUrl: null };
+          exerciseName = mockData.name;
+          videoUrl = mockData.videoUrl;
+        }
+        
+        const processedExercise = {
+          exercise: exerciseId, // Will be null for mock exercises
+          exerciseName: exerciseName,
+          videoUrl: videoUrl, // Include video URL directly in workout document
+          description: description,
+          category: category,
+          difficulty: difficulty,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          weight: exercise.weight || 0,
+          restTime: exercise.restTime || 60
+        };
+        
+        console.log('Processed exercise with video URL:', processedExercise);
+        processedExercises.push(processedExercise);
+      }
+    }
+
+    // Prepare update data
+    const updateData = {
+      ...req.body,
+      exercises: processedExercises
+    };
+
     const workoutSchedule = await Workout.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -355,6 +464,8 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    console.log('Workout schedule updated successfully');
+
     res.json({
       success: true,
       message: 'Workout schedule updated successfully',
@@ -362,9 +473,11 @@ router.put('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Update workout schedule error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
+      details: error.message
     });
   }
 });
