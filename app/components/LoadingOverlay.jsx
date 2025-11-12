@@ -9,8 +9,7 @@ export default function LoadingOverlay({ visible = false, message = "Loading..."
     <Modal transparent visible={visible} animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <LoadingGif size={120} />
-          <Text style={styles.message}>{message}</Text>
+          <LoadingGif size={200} />
         </View>
       </View>
     </Modal>
@@ -35,11 +34,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  message: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '500',
   },
 });

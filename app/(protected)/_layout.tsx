@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { TouchableOpacity, StatusBar } from 'react-native';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/customAlert';
@@ -9,11 +9,11 @@ export default function ProtectedLayout() {
   const router = useRouter();
   const { logout } = useAuth();
 
-  useEffect(() => {
-    // Set status bar to match header
-    StatusBar.setBarStyle('light-content');
+  // Set status bar to match header
+  StatusBar.setBarStyle('light-content');
+  if (StatusBar.setBackgroundColor) {
     StatusBar.setBackgroundColor('#000000');
-  }, []);
+  }
 
   const handleLogout = () => {
     showConfirm(
@@ -91,10 +91,21 @@ export default function ProtectedLayout() {
       />
       <Stack.Screen
         name="ScheduleDetails"
-        options={{
-          title: 'ScheduleDetails',
-          headerShown: false // Exercise is part of Home tabs
-        }}
+        options={({ route }: any) => ({
+          title: 'Schedule Details',
+          headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => {
+                const params = route.params;
+                router.push(`/AddSchedule?userId=${params?.userId}&scheduleId=${params?.scheduleId}&mode=edit`);
+              }}
+              style={{ marginRight: 15 }}
+            >
+              <Feather name="edit-2" size={20} color="#d8d8d8ff" />
+            </TouchableOpacity>
+          ),
+        })}
       />
       <Stack.Screen
         name="Foods"
@@ -143,7 +154,8 @@ export default function ProtectedLayout() {
       <Stack.Screen
         name="AddDiet"
         options={{
-          title: 'Add Diet'
+          title: 'Add Diet',
+          headerShown: false
         }}
       />
 
@@ -156,7 +168,18 @@ export default function ProtectedLayout() {
       <Stack.Screen
         name="Chat"
         options={{
-          headerShown: false
+          title: 'Chat',
+          headerShown: true,
+          headerTitleAlign: 'left',
+          headerRight: () => null, // No logout icon for chat
+          headerStyle: {
+            backgroundColor: '#000',
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 1,
+            borderBottomColor: '#333',
+            height: 100, // Increased height for more padding
+          },
         }}
       />
       <Stack.Screen

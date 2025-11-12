@@ -99,7 +99,7 @@ export default function MeasurementHistory() {
     if (loading) {
         return (
             <View style={[styles.container, styles.centered]}>
-                <LoadingGif size={100} />
+                <LoadingGif size={200} />
             </View>
         );
     }

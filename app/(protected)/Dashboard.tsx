@@ -732,7 +732,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileModal: {
-    backgroundColor: "#1c1c1c",
+    backgroundColor: "#000000ff",
+    borderWidth: 1,
+    borderColor: "#272727ff",
     borderRadius: 25,
     padding: 30,
     width: "85%",
@@ -749,15 +751,14 @@ const styles = StyleSheet.create({
     color: "#999",
     fontSize: 14,
     marginBottom: 25,
+    marginTop: -9,
     fontFamily: "Poppins_300Light",
   },
   modalProfilePic: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 100,
     marginBottom: 25,
-    borderWidth: 3,
-    borderColor: "#d5ff5f",
   },
   modalButtons: {
     flexDirection: "row",
@@ -772,20 +773,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginHorizontal: 5,
   },
-  cancelButton: {
-    backgroundColor: "#333",
-  },
-  changeButton: {
-    backgroundColor: "#d5ff5f",
-  },
   cancelButtonText: {
-    color: "#fff",
+    color: "#ffcfcfff",
     fontSize: 16,
     fontWeight: "500",
     fontFamily: "Poppins_300Light",
   },
   changeButtonText: {
-    color: "#000",
+    color: "#ffffffff",
     fontSize: 16,
     fontWeight: "600",
     fontFamily: "Poppins_300Light",

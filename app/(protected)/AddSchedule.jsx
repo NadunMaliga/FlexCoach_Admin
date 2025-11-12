@@ -57,6 +57,12 @@ export default function AddSchedule() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
+  // Validation errors
+  const [step1Error, setStep1Error] = useState('');
+  const [step2Error, setStep2Error] = useState('');
+  const [step3Error, setStep3Error] = useState('');
+  const [exerciseAddError, setExerciseAddError] = useState('');
+
   // Exercise data from API
   const [exerciseOptions, setExerciseOptions] = useState([]);
   const [loadingExercises, setLoadingExercises] = useState(false);
@@ -194,20 +200,41 @@ export default function AddSchedule() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LoadingGif size={100} />
-        <Text style={{ color: '#999', marginTop: 20, fontFamily: 'Poppins_400Regular' }}>
-          Loading schedule...
-        </Text>
+        <LoadingGif size={200} />
       </View>
     );
   }
 
   const addExercise = () => {
-    if (!tempExercise.name || !tempExercise.exerciseId || !tempExercise.sets || !tempExercise.reps) {
+    // Clear previous error
+    setExerciseAddError('');
+
+    // Validate required fields
+    if (!tempExercise.name || !tempExercise.exerciseId) {
+      setExerciseAddError('Please select an exercise');
+      HapticFeedback.error();
       return;
     }
+    if (!tempExercise.sets || parseInt(tempExercise.sets) <= 0) {
+      setExerciseAddError('Please enter valid number of sets');
+      HapticFeedback.error();
+      return;
+    }
+    if (!tempExercise.reps || parseInt(tempExercise.reps) <= 0) {
+      setExerciseAddError('Please enter valid number of reps');
+      HapticFeedback.error();
+      return;
+    }
+    if (!tempExercise.rest || parseInt(tempExercise.rest) <= 0) {
+      setExerciseAddError('Please enter valid rest time');
+      HapticFeedback.error();
+      return;
+    }
+
+    // Add exercise
     setExercises([...exercises, tempExercise]);
     setTempExercise({ name: "", exerciseId: "", sets: "", reps: "", weight: "", rest: "" });
+    HapticFeedback.success();
   };
 
   // Save workout schedule to backend
@@ -279,19 +306,73 @@ export default function AddSchedule() {
   };
 
   const onNext = async () => {
-    if (currentStep === 1 && (!workoutName.trim() || !day.trim() || !workoutType.trim())) return;
-    if (currentStep === 2 && exercises.length === 0) return;
-    if (currentStep === 3 && !duration.trim()) return;
+    // Clear previous errors
+    setStep1Error('');
+    setStep2Error('');
+    setStep3Error('');
+    setSaveError(null);
+
+    // Step 1 validation
+    if (currentStep === 1) {
+      if (!workoutName.trim()) {
+        setStep1Error('Please enter a workout name');
+        HapticFeedback.error();
+        return;
+      }
+      if (!day.trim()) {
+        setStep1Error('Please enter a day number');
+        HapticFeedback.error();
+        return;
+      }
+      if (parseInt(day) <= 0) {
+        setStep1Error('Day number must be greater than 0');
+        HapticFeedback.error();
+        return;
+      }
+      if (!workoutType.trim()) {
+        setStep1Error('Please select a workout type');
+        HapticFeedback.error();
+        return;
+      }
+    }
+
+    // Step 2 validation
+    if (currentStep === 2) {
+      if (exercises.length === 0) {
+        setStep2Error('Please add at least one exercise');
+        HapticFeedback.error();
+        return;
+      }
+    }
+
+    // Step 3 validation
+    if (currentStep === 3) {
+      if (!duration.trim()) {
+        setStep3Error('Please enter workout duration');
+        HapticFeedback.error();
+        return;
+      }
+      if (parseInt(duration) <= 0) {
+        setStep3Error('Duration must be greater than 0');
+        HapticFeedback.error();
+        return;
+      }
+    }
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
+      HapticFeedback.light();
     } else {
       // Final step - save the workout schedule
       setSaving(true);
       const saved = await saveWorkoutSchedule();
       setSaving(false);
       if (saved) {
+        showSuccess(isEditMode ? 'Schedule updated successfully' : 'Schedule created successfully');
         router.back();
+      } else {
+        // Error is already set in saveWorkoutSchedule
+        HapticFeedback.error();
       }
     }
   };
@@ -317,7 +398,10 @@ export default function AddSchedule() {
         placeholder="Workout Name (e.g., Upper Body Strength)"
         placeholderTextColor="#999"
         value={workoutName}
-        onChangeText={setWorkoutName}
+        onChangeText={(text) => {
+          setWorkoutName(text);
+          setStep1Error('');
+        }}
       />
 
       <TextInput
@@ -325,20 +409,31 @@ export default function AddSchedule() {
         placeholder="Enter Day Number (1, 2, 3, 4, 5, 6, 7, 8, 9, 10...)"
         placeholderTextColor="#999"
         value={day}
-        onChangeText={setDay}
+        onChangeText={(text) => {
+          setDay(text);
+          setStep1Error('');
+        }}
         keyboardType="numeric"
       />
 
       {/* Workout Type Selector */}
       <TouchableOpacity
         style={styles.selectBox}
-        onPress={() => setWorkoutTypeModalVisible(true)}
+        onPress={() => {
+          setWorkoutTypeModalVisible(true);
+          setStep1Error('');
+        }}
       >
         <Text style={styles.selectText}>
           {workoutType ? workoutType : "Choose Workout Type"}
         </Text>
         <Feather name="chevron-down" size={20} color="#fff" />
       </TouchableOpacity>
+
+      {/* Error Message */}
+      {step1Error ? (
+        <Text style={styles.errorMessage}>{step1Error}</Text>
+      ) : null}
 
       {/* Workout Type Modal */}
       <Modal
@@ -471,7 +566,10 @@ export default function AddSchedule() {
         placeholderTextColor="#999"
         keyboardType="numeric"
         value={tempExercise.sets}
-        onChangeText={(t) => setTempExercise({ ...tempExercise, sets: t })}
+        onChangeText={(t) => {
+          setTempExercise({ ...tempExercise, sets: t });
+          setExerciseAddError('');
+        }}
       />
       <TextInput
         style={styles.input}
@@ -479,7 +577,10 @@ export default function AddSchedule() {
         placeholderTextColor="#999"
         keyboardType="numeric"
         value={tempExercise.reps}
-        onChangeText={(t) => setTempExercise({ ...tempExercise, reps: t })}
+        onChangeText={(t) => {
+          setTempExercise({ ...tempExercise, reps: t });
+          setExerciseAddError('');
+        }}
       />
       <TextInput
         style={styles.input}
@@ -495,12 +596,25 @@ export default function AddSchedule() {
         placeholderTextColor="#999"
         keyboardType="numeric"
         value={tempExercise.rest}
-        onChangeText={(t) => setTempExercise({ ...tempExercise, rest: t })}
+        onChangeText={(t) => {
+          setTempExercise({ ...tempExercise, rest: t });
+          setExerciseAddError('');
+        }}
       />
+
+      {/* Exercise Add Error Message */}
+      {exerciseAddError ? (
+        <Text style={styles.errorMessage}>{exerciseAddError}</Text>
+      ) : null}
 
       <TouchableOpacity style={styles.addBtn} onPress={addExercise}>
         <Text style={styles.addBtnText}>Add Exercise</Text>
       </TouchableOpacity>
+
+      {/* Step 2 Error Message */}
+      {step2Error ? (
+        <Text style={[styles.errorMessage, { marginTop: 15 }]}>{step2Error}</Text>
+      ) : null}
 
       <ScrollView style={{ maxHeight: 200, marginTop: 20 }}>
         {exercises.map((ex, idx) => (
@@ -517,6 +631,9 @@ export default function AddSchedule() {
                   setTempExercise(ex);
                   // Remove from list so it can be re-added after editing
                   setExercises(exercises.filter((_, i) => i !== idx));
+                  setStep2Error('');
+                  setExerciseAddError('');
+                  HapticFeedback.light();
                 }}
                 style={{ padding: 5 }}
               >
@@ -532,7 +649,11 @@ export default function AddSchedule() {
                       {
                         text: 'Delete',
                         style: 'destructive',
-                        onPress: () => setExercises(exercises.filter((_, i) => i !== idx))
+                        onPress: () => {
+                          setExercises(exercises.filter((_, i) => i !== idx));
+                          setStep2Error('');
+                          HapticFeedback.success();
+                        }
                       }
                     ]
                   );
@@ -577,8 +698,21 @@ export default function AddSchedule() {
         placeholderTextColor="#999"
         keyboardType="numeric"
         value={duration}
-        onChangeText={setDuration}
+        onChangeText={(text) => {
+          setDuration(text);
+          setStep3Error('');
+        }}
       />
+
+      {/* Step 3 Error Message */}
+      {step3Error ? (
+        <Text style={styles.errorMessage}>{step3Error}</Text>
+      ) : null}
+
+      {/* Save Error Message */}
+      {saveError ? (
+        <Text style={styles.errorMessage}>{saveError}</Text>
+      ) : null}
     </>
   );
 
@@ -866,5 +1000,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     padding: 20,
     fontFamily: "Poppins_400Regular",
+  },
+  errorMessage: {
+    color: "#ff6b6b",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    marginTop: 10,
+    marginBottom: 5,
+    textAlign: "center",
   },
 });

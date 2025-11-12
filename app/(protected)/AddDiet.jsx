@@ -1,3 +1,9 @@
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  useFonts,
+} from "@expo-google-fonts/poppins";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -18,6 +24,7 @@ import {
 import ApiService from '../services/api';
 import Logger from '../utils/logger';
 import LoadingGif from '../components/LoadingGif';
+import HapticFeedback from '../utils/haptics';
 import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
@@ -36,6 +43,12 @@ export default function AddDiet() {
   const totalSteps = 3;
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(isEditMode); // Start loading if in edit mode
+
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+  });
 
   // Step 1 - Meal Plan Selection
   const mealPlanOptions = ["Meal 1", "Meal 2", "Meal 3"];
@@ -56,6 +69,16 @@ export default function AddDiet() {
 
   // State for existing meal plans
   const [existingMealPlans, setExistingMealPlans] = useState([]);
+
+  // Error states
+  const [step1Error, setStep1Error] = useState('');
+  const [step2Error, setStep2Error] = useState('');
+  const [step3Error, setStep3Error] = useState('');
+  const [foodAddError, setFoodAddError] = useState('');
+  const [saveError, setSaveError] = useState(null);
+
+  // Saving state
+  const [saving, setSaving] = useState(false);
 
   // Load foods and existing meal plans from database
   const loadFoods = async () => {
@@ -101,7 +124,7 @@ export default function AddDiet() {
   useEffect(() => {
     loadFoods();
     loadExistingMealPlans();
-    
+
     // Load existing diet data if in edit mode
     if (isEditMode) {
       loadDietForEdit();
@@ -111,22 +134,22 @@ export default function AddDiet() {
   // Load existing diet data for editing
   const loadDietForEdit = async () => {
     if (!ApiService || !dietId) return;
-    
+
     try {
       setLoading(true);
       Logger.log('Loading diet for edit, dietId:', dietId);
-      
+
       const response = await OfflineApiService.getUserDietPlans(userId);
-      
+
       if (response.success && response.dietPlans) {
         const dietToEdit = response.dietPlans.find(d => d._id === dietId);
-        
+
         if (dietToEdit) {
           Logger.log('Found diet to edit:', dietToEdit);
-          
+
           // Set meal plan name
           setSelectedMealPlan(dietToEdit.name || '');
-          
+
           // Transform meals back to addedFoods format (array of food objects)
           const transformedFoods = {};
           dietToEdit.meals.forEach(meal => {
@@ -138,16 +161,16 @@ export default function AddDiet() {
               } else {
                 quantityStr = `${food.quantity}`;
               }
-              
+
               return {
                 name: food.foodName,
                 quantity: quantityStr
               };
             });
-            
+
             transformedFoods[meal.time] = foodList;
           });
-          
+
           setAddedFoods(transformedFoods);
           Logger.log('Loaded foods for editing:', transformedFoods);
         } else {
@@ -165,29 +188,62 @@ export default function AddDiet() {
   };
 
   const onNext = async () => {
-    if (currentStep === 1 && !selectedMealPlan.trim()) {
-      showAlert('Error', 'Please select a meal plan');
-      return;
+    // Clear previous errors
+    setStep1Error('');
+    setStep2Error('');
+    setStep3Error('');
+    setSaveError(null);
+
+    // Step 1 validation
+    if (currentStep === 1) {
+      if (!selectedMealPlan.trim()) {
+        setStep1Error('Please select a meal plan');
+        HapticFeedback.error();
+        return;
+      }
     }
-    if (currentStep === 2 && Object.keys(addedFoods).length === 0) {
-      showAlert('Error', 'Please add at least one meal');
-      return;
+
+    // Step 2 validation
+    if (currentStep === 2) {
+      if (Object.keys(addedFoods).length === 0) {
+        setStep2Error('Please add at least one meal');
+        HapticFeedback.error();
+        return;
+      }
     }
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
+      HapticFeedback.light();
     } else {
       await saveDietPlan();
     }
   };
 
   const onBack = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
-    else router.back();
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      HapticFeedback.light();
+    } else {
+      router.back();
+    }
   };
 
   const addFoodToList = () => {
-    if (!tempFood.name || !tempFood.quantity) return;
+    // Clear previous error
+    setFoodAddError('');
+
+    // Validate required fields
+    if (!tempFood.name) {
+      setFoodAddError('Please select a food item');
+      HapticFeedback.error();
+      return;
+    }
+    if (!tempFood.quantity.trim()) {
+      setFoodAddError('Please enter quantity');
+      HapticFeedback.error();
+      return;
+    }
 
     setAddedFoods((prev) => {
       const updated = { ...prev };
@@ -198,6 +254,8 @@ export default function AddDiet() {
     });
 
     setTempFood({ name: "", quantity: "" });
+    setStep2Error('');
+    HapticFeedback.success();
   };
 
   const saveDietPlan = async () => {
@@ -207,7 +265,7 @@ export default function AddDiet() {
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
 
       const meals = [];
       let totalCalories = 0;
@@ -294,40 +352,49 @@ export default function AddDiet() {
       }
 
       if (response.success) {
-        Alert.alert(
-          "Success",
-          actionMessage,
-          [
-            {
-              text: "OK",
-              onPress: () => router.back()
-            }
-          ]
-        );
+        HapticFeedback.success();
+        showSuccess(actionMessage);
+        router.back();
       } else {
-        Alert.alert("Error", response.error || "Failed to save diet plan");
+        setSaveError(response.error || "Failed to save diet plan");
+        HapticFeedback.error();
       }
 
     } catch (error) {
       Logger.error('Save diet plan error:', error);
-      showAlert('Error', 'Failed to save diet plan. Please try again.');
+      setSaveError('Failed to save diet plan. Please try again.');
+      HapticFeedback.error();
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const renderStep1 = () => (
     <View>
       <Text style={styles.stepTitle}>Step 1: Select Meal Plan</Text>
+ 
+
       <TouchableOpacity
         style={styles.selectBox}
-        onPress={() => setMealSelectModalVisible(true)}
+        onPress={() => {
+          setMealSelectModalVisible(true);
+          setStep1Error('');
+        }}
       >
         <Text style={styles.selectText}>
           {selectedMealPlan || "Choose Meal Plan"}
         </Text>
         <Feather name="chevron-up" size={20} color="#fff" />
+        
       </TouchableOpacity>
+
+      <Text style={styles.text}>
+        Create a customized diet plan for your client. Select a meal plan to get started.
+      </Text>
+      {/* Error Message */}
+      {step1Error ? (
+        <Text style={styles.errorMessage}>{step1Error}</Text>
+      ) : null}
 
       <Modal
         visible={mealSelectModalVisible}
@@ -344,7 +411,7 @@ export default function AddDiet() {
                 <Feather name="x" size={22} color="#fff" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ marginTop: 15 }}>
+            <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={true}>
               {mealPlanOptions.map((meal, idx) => (
                 <TouchableOpacity
                   key={idx}
@@ -352,6 +419,8 @@ export default function AddDiet() {
                   onPress={() => {
                     setSelectedMealPlan(meal);
                     setMealSelectModalVisible(false);
+                    setStep1Error('');
+                    HapticFeedback.light();
                   }}
                 >
                   <Text style={styles.optionText}>{meal}</Text>
@@ -367,7 +436,7 @@ export default function AddDiet() {
   const renderStep2 = () => (
     <View>
       <Text style={styles.stepTitle}>Step 2: Add Foods</Text>
-
+ 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -382,7 +451,7 @@ export default function AddDiet() {
             ]}
             onPress={() => setSelectedMealType(meal)}
           >
-            <Text style={{ color: selectedMealType === meal ? "black" : "#fff" }}>
+            <Text style={{ color: selectedMealType === meal ? "black" : "#fff", fontFamily: "Poppins_400Regular" }}>
               {meal}
             </Text>
           </TouchableOpacity>
@@ -391,7 +460,10 @@ export default function AddDiet() {
 
       <TouchableOpacity
         style={styles.selectBox}
-        onPress={() => setFoodModalVisible(true)}
+        onPress={() => {
+          setFoodModalVisible(true);
+          setFoodAddError('');
+        }}
       >
         <Text style={styles.selectText}>{tempFood.name || "Choose Food"}</Text>
         <Feather name="chevron-down" size={20} color="#fff" />
@@ -402,22 +474,35 @@ export default function AddDiet() {
         placeholder="Quantity (e.g., 2 cups, 150g, 1 piece)"
         placeholderTextColor="#999"
         value={tempFood.quantity}
-        onChangeText={(t) => setTempFood({ ...tempFood, quantity: t })}
+        onChangeText={(t) => {
+          setTempFood({ ...tempFood, quantity: t });
+          setFoodAddError('');
+        }}
       />
+
+      {/* Food Add Error Message */}
+      {foodAddError ? (
+        <Text style={styles.errorMessage}>{foodAddError}</Text>
+      ) : null}
 
       <TouchableOpacity style={styles.addBtn} onPress={addFoodToList}>
         <Text style={styles.addBtnText}>Add Food</Text>
       </TouchableOpacity>
 
-      <ScrollView style={{ maxHeight: 200, marginTop: 20 }}>
+      {/* Step 2 Error Message */}
+      {step2Error ? (
+        <Text style={[styles.errorMessage, { marginTop: 15 }]}>{step2Error}</Text>
+      ) : null}
+
+      <ScrollView style={{ maxHeight: 200, marginTop: 20 }} showsVerticalScrollIndicator={true}>
         {Object.keys(addedFoods).length === 0 ? (
-          <Text style={{ color: "#aaa", textAlign: "center" }}>
+          <Text style={{ color: "#aaa", textAlign: "center", fontFamily: "Poppins_400Regular" }}>
             No foods added yet
           </Text>
         ) : (
           Object.entries(addedFoods).map(([meal, foods], i) => (
             <View key={i} style={{ marginBottom: 15 }}>
-              <Text style={{ color: "#fff", fontWeight: "600", marginBottom: 3 }}>
+              <Text style={{ color: "#fff", fontWeight: "600", marginBottom: 3, fontFamily: "Poppins_400Regular" }}>
                 {meal}:
               </Text>
               {foods.map((f, idx) => (
@@ -434,7 +519,7 @@ export default function AddDiet() {
                     borderRadius: 8,
                   }}
                 >
-                  <Text style={{ color: "#b8b5b5ff", flex: 1 }}>
+                  <Text style={{ color: "#b8b5b5ff", flex: 1, fontFamily: "Poppins_400Regular" }}>
                     • {f.name} - {f.quantity}
                   </Text>
                   <View style={{ flexDirection: "row", gap: 10 }}>
@@ -452,10 +537,13 @@ export default function AddDiet() {
                           }
                           return updated;
                         });
+                        setStep2Error('');
+                        setFoodAddError('');
+                        HapticFeedback.light();
                       }}
                       style={{ padding: 4 }}
                     >
-                      <Feather name="edit-2" size={16} color="#d5ff5f" />
+                      <Feather name="edit-2" size={16} color="#b8b8b8ff" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => {
@@ -468,10 +556,12 @@ export default function AddDiet() {
                           }
                           return updated;
                         });
+                        setStep2Error('');
+                        HapticFeedback.success();
                       }}
                       style={{ padding: 4 }}
                     >
-                      <Feather name="trash-2" size={16} color="#ff6b6b" />
+                      <Feather name="trash-2" size={16} color="#ff8282ff" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -490,14 +580,14 @@ export default function AddDiet() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', fontFamily: "Poppins_400Regular" }}>
                 Select Food
               </Text>
               <TouchableOpacity onPress={() => setFoodModalVisible(false)}>
                 <Feather name="x" size={22} color="#fff" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ marginTop: 15 }}>
+            <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={true}>
               {loadingFoods ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
                   <LoadingGif size={24} />
@@ -510,6 +600,8 @@ export default function AddDiet() {
                     onPress={() => {
                       setTempFood({ ...tempFood, name: food });
                       setFoodModalVisible(false);
+                      setFoodAddError('');
+                      HapticFeedback.light();
                     }}
                   >
                     <Text style={styles.optionText}>{food}</Text>
@@ -526,19 +618,21 @@ export default function AddDiet() {
   const renderStep3 = () => (
     <View>
       <Text style={styles.stepTitle}>Step 3: Preview & Confirm</Text>
-      <ScrollView style={{ maxHeight: 400, marginBottom: 15 }}>
-        <Text style={{ color: '#d5ff5f', fontSize: 16, marginBottom: 10 }}>
+ 
+
+      <ScrollView style={{ maxHeight: 400, marginBottom: 15 }} showsVerticalScrollIndicator={true}>
+        <Text style={{ color: '#dfdfdfff', fontSize: 16, marginBottom: 10, fontFamily: "Poppins_400Regular" }}>
           Selected Plan: {selectedMealPlan}
         </Text>
         {Object.entries(addedFoods).map(([meal, foods], i) => (
           <View key={i} style={{ marginBottom: 15 }}>
-            <Text style={{ color: "#fff", fontWeight: "600", marginBottom: 3 }}>
+            <Text style={{ color: "#fff", fontWeight: "600", marginBottom: 3, fontFamily: "Poppins_400Regular" }}>
               {meal}:
             </Text>
             {foods.map((f, idx) => (
               <Text
                 key={idx}
-                style={{ color: "#b8b5b5ff", marginLeft: 10, marginBottom: 2 }}
+                style={{ color: "#b8b5b5ff", marginLeft: 10, marginBottom: 2, fontFamily: "Poppins_400Regular" }}
               >
                 • {f.name} - {f.quantity}
               </Text>
@@ -546,6 +640,11 @@ export default function AddDiet() {
           </View>
         ))}
       </ScrollView>
+
+      {/* Save Error Message */}
+      {saveError ? (
+        <Text style={styles.errorMessage}>{saveError}</Text>
+      ) : null}
     </View>
   );
 
@@ -558,6 +657,17 @@ export default function AddDiet() {
     }
   };
 
+  if (!fontsLoaded) return null;
+
+  // Show loading screen while fetching diet data in edit mode
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <LoadingGif size={200} />
+       </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -566,6 +676,20 @@ export default function AddDiet() {
     >
       <StatusBar barStyle="light-content" backgroundColor="black" />
 
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} style={{ padding: 5 }}>
+          <Feather name="arrow-left" size={22} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {isEditMode ? 'Edit Diet' : 'Add Diet'}
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 5 }}>
+          <Feather name="x" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Step Indicator */}
       <View style={styles.stepIndicator}>
         <View style={styles.stepTrack}>
           <View
@@ -581,22 +705,22 @@ export default function AddDiet() {
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
       >
         {renderStep()}
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.nextBtn, loading && styles.disabledBtn]}
+          style={[styles.nextBtn, saving && { opacity: 0.7 }]}
           onPress={onNext}
-          disabled={loading}
+          disabled={saving}
         >
-          {loading ? (
-            <ActivityIndicator size="small" color="#d5ff5f" />
+          {saving ? (
+            <ActivityIndicator size="small" color="#000" />
           ) : (
             <Text style={styles.nextBtnText}>
-              {currentStep === totalSteps ? "Confirm" : "Next"}
+              {currentStep === totalSteps ? (isEditMode ? "Update" : "Confirm") : "Next"}
             </Text>
           )}
         </TouchableOpacity>
@@ -607,11 +731,34 @@ export default function AddDiet() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
+  header: {
+    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 10,
+    paddingBottom: 15,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "black",
+  },
+  headerTitle: {
+    color: "white",
+    fontSize: 19,
+    fontFamily: "Poppins_300Light",
+  },
+  text:{
+    color:"#a2a2a2ff",
+    textAlign:"center",
+    marginHorizontal:9, 
+    fontSize: 14,
+    fontFamily: "Poppins_300Light",
+    marginTop:10,
+    marginBottom:10,
+  },
   stepIndicator: { paddingHorizontal: 20, marginBottom: 10 },
   stepTrack: { height: 6, backgroundColor: "#333", borderRadius: 3 },
   stepProgress: { height: 6, backgroundColor: "#d5ff5f", borderRadius: 3 },
-  stepText: { color: "#aaa", marginTop: 10, fontSize: 13 },
-  stepTitle: { fontSize: 22, color: "#fff", marginBottom: 15 },
+  stepText: { color: "#aaa", marginTop: 10, fontSize: 13, fontFamily: "Poppins_300Light" },
+  stepTitle: { fontSize: 22, color: "#fff", marginBottom: 15, fontFamily: "Poppins_300Light" },
   input: {
     backgroundColor: "#1d1d1dff",
     borderRadius: 20,
@@ -620,6 +767,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     marginBottom: 15,
+    fontFamily: "Poppins_300Light",
   },
   selectBox: {
     backgroundColor: "#1c1c1c",
@@ -630,7 +778,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
-  selectText: { color: "#fff", fontSize: 16 },
+  selectText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_300Light" },
   addBtn: {
     backgroundColor: "black",
     borderColor: "#525252ff",
@@ -641,28 +789,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
   },
-  addBtnText: { color: "white", fontWeight: "600" },
+  addBtnText: { color: "white", fontWeight: "600", fontFamily: "Poppins_300Light" },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#d5ff5f",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    padding: 25,
     paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#171717ff",
   },
   nextBtn: {
-    backgroundColor: "black",
+    backgroundColor: "#d5ff5f",
     paddingVertical: 22,
     borderRadius: 50,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 20,
   },
-  nextBtnText: { fontSize: 18, color: "#fff", textAlign: "center" },
+  nextBtnText: {
+    fontSize: 18,
+    color: "#0000",
+    fontFamily: "Poppins_300Light",
+    textAlign: "center",
+  },
   mealTypeBtn: {
     backgroundColor: "#3a3a3a",
     paddingVertical: 10,
@@ -692,6 +840,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#1e1d1dff",
   },
-  optionText: { color: "#949191ff", fontSize: 16 },
+  optionText: { color: "#949191ff", fontSize: 16, fontFamily: "Poppins_300Light" },
   disabledBtn: { opacity: 0.6 },
+  errorMessage: {
+    color: "#ff6b6b",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    marginTop: 10,
+    marginBottom: 5,
+    textAlign: "center",
+  },
 });

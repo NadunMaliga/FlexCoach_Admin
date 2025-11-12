@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
 import * as Audio from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import {
   Animated,
   FlatList,
   Image,
+  ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -31,8 +32,9 @@ import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
 export default function ChatScreen() {
-  const { userId } = useLocalSearchParams();
+  const { userId, userName } = useLocalSearchParams();
   const router = useRouter();
+  const navigation = useNavigation();
 
   const [userInfo, setUserInfo] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -105,7 +107,7 @@ export default function ChatScreen() {
           setLoading(false); // Show cached messages immediately
         }
 
-        // Load user info and connect in parallel (background)
+        // Load user info for header
         const [userResponse, profileResponse] = await Promise.all([
           OfflineApiService.getUserById(userId),
           OfflineApiService.getUserProfile(userId)
@@ -156,7 +158,7 @@ export default function ChatScreen() {
 
         // Set default user info if loading fails
         setUserInfo({
-          name: "User",
+          name: userName || "User",
           avatar: "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
           status: "Unknown"
         });
@@ -172,6 +174,44 @@ export default function ChatScreen() {
       ChatService.disconnect();
     };
   }, [userId]);
+
+  // Update header with user info and connection status
+  useEffect(() => {
+    if (userInfo) {
+      navigation.setOptions({
+        headerTitle: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 8 }}>
+            <Image
+              source={{
+                uri: userInfo.avatar,
+                cache: 'force-cache'
+              }}
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 50,
+                marginRight: 10,
+              }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', fontFamily: 'Poppins_300Light' }}>
+                {userInfo.name}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+
+                <Text style={{ color: '#999', fontSize: 13, marginTop: -9, fontFamily: 'Poppins_300Light' }}>
+                  {connectionStatus === 'connected' ? 'Connected' :
+                    connectionStatus === 'connecting' ? 'Connecting...' :
+                      connectionStatus === 'error' ? 'Connection Error' : 'Disconnected'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ),
+        headerRight: () => null, // Remove logout icon
+      });
+    }
+  }, [userInfo, connectionStatus, navigation]);
 
   // Setup chat event listeners
   useEffect(() => {
@@ -443,7 +483,37 @@ export default function ChatScreen() {
                   opacity: item.sending ? 0.7 : 1,
                   paddingRight: 50, // Space for timestamp
                 }}>
-                  {item.text}
+                  {(() => {
+                    // Better emoji detection using regex
+                    const emojiRegex = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{FE00}-\u{FE0F}]|[\u{1F004}]|[\u{1F0CF}]|[\u{1F18E}]|[\u{3030}]|[\u{2B50}]|[\u{2B55}]|[\u{231A}]|[\u{231B}]|[\u{23E9}-\u{23EC}]|[\u{23F0}]|[\u{23F3}]|[\u{25FD}]|[\u{25FE}]|[\u{2614}]|[\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}]|[\u{26AB}]|[\u{26BD}]|[\u{26BE}]|[\u{26C4}]|[\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}]|[\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2705}]|[\u{270A}]|[\u{270B}]|[\u{2728}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2795}-\u{2797}]|[\u{27B0}]|[\u{27BF}]|[\u{2B1B}]|[\u{2B1C}])/gu;
+
+                    const parts = [];
+                    let lastIndex = 0;
+                    let match;
+
+                    while ((match = emojiRegex.exec(item.text)) !== null) {
+                      // Add text before emoji
+                      if (match.index > lastIndex) {
+                        parts.push(item.text.substring(lastIndex, match.index));
+                      }
+
+                      // Add emoji with larger size
+                      parts.push(
+                        <Text key={`emoji-${match.index}`} style={{ fontSize: 32 }}>
+                          {match[0]}
+                        </Text>
+                      );
+
+                      lastIndex = emojiRegex.lastIndex;
+                    }
+
+                    // Add remaining text
+                    if (lastIndex < item.text.length) {
+                      parts.push(item.text.substring(lastIndex));
+                    }
+
+                    return parts.length > 0 ? parts : item.text;
+                  })()}
                 </Text>
                 <View style={styles.timestampContainer}>
                   <Text style={[
@@ -604,51 +674,19 @@ export default function ChatScreen() {
     );
   };
 
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#111" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#111" />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
+        behavior="padding"
+        keyboardVerticalOffset={-20}
       >
-        <View style={styles.container}>
-          <View style={{ height: statusBarHeight }} />
-          {/* User info section */}
-          <View style={styles.userInfo}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ marginRight: 12, padding: 4 }}
-            >
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Image
-              source={{
-                uri: userInfo?.avatar || "https://i.pinimg.com/736x/6f/a3/6a/6fa36aa2c367da06b2a4c8ae1cf9ee02.jpg",
-                cache: 'force-cache'
-              }}
-              style={styles.profilePic}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.username}>{userInfo?.name || "Loading..."}</Text>
-              {/* Connection status */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                <View style={[
-                  styles.connectionDot,
-                  connectionStatus === 'connected' && styles.connectedDot,
-                  connectionStatus === 'connecting' && styles.connectingDot,
-                  connectionStatus === 'error' && styles.errorDot
-                ]} />
-                <Text style={styles.connectionText}>
-                  {connectionStatus === 'connected' ? 'Connected' :
-                    connectionStatus === 'connecting' ? 'Connecting...' :
-                      connectionStatus === 'error' ? 'Connection Error' : 'Disconnected'}
-                </Text>
-              </View>
-            </View>
-          </View>
+        <ImageBackground
+          source={require('../../assets/images/chatbg.jpg')}
+          style={styles.container}
+          resizeMode="cover"
+        >
 
           {/* Messages */}
           {loading ? (
@@ -659,7 +697,7 @@ export default function ChatScreen() {
           ) : messages.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No messages yet</Text>
-              <Text style={styles.emptySubtext}>Start a conversation with {userInfo?.name || "this user"}</Text>
+              <Text style={styles.emptySubtext}>Start a conversation</Text>
             </View>
           ) : (
             <View style={{ flex: 1 }}>
@@ -679,7 +717,7 @@ export default function ChatScreen() {
               {/* Typing indicator */}
               {isTyping && (
                 <View style={styles.typingContainer}>
-                  <Text style={styles.typingText}>{userInfo?.name || "User"} is typing...</Text>
+                  <Text style={styles.typingText}>Typing...</Text>
                 </View>
               )}
             </View>
@@ -687,10 +725,6 @@ export default function ChatScreen() {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <TouchableOpacity style={{ marginRight: 10 }} onPress={pickImage}>
-              <Ionicons name="image-outline" size={24} color="#afafaf" />
-            </TouchableOpacity>
-
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -698,6 +732,9 @@ export default function ChatScreen() {
                 placeholderTextColor="#999"
                 value={input}
                 maxLength={1000}
+                multiline={true}
+                numberOfLines={1}
+                textAlignVertical="center"
                 onChangeText={(text) => {
                   setInput(text);
 
@@ -725,12 +762,20 @@ export default function ChatScreen() {
                 returnKeyType="send"
                 editable={!sending}
               />
-              <TouchableOpacity
-                style={styles.emojiInside}
-                onPress={() => setIsEmojiOpen(true)}
-              >
-                <Ionicons name="happy-outline" size={22} color="#afafaf" />
-              </TouchableOpacity>
+              <View style={styles.inputIconsContainer}>
+                <TouchableOpacity
+                  style={styles.inputIcon}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="attach-outline" size={26} color="#afafaf" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.inputIcon}
+                  onPress={() => setIsEmojiOpen(true)}
+                >
+                  <Ionicons name="happy-outline" size={26} color="#afafaf" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -795,13 +840,13 @@ export default function ChatScreen() {
                 <Text style={styles.deleteTitle}>Delete this message?</Text>
                 <View style={styles.deleteActions}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#444" }]}
+                    style={[styles.actionBtn, {color:"red"}]}
                     onPress={() => setDeleteMsgId(null)}
                   >
                     <Text style={{ color: "white", fontSize: 16 }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#d9534f" }]}
+                    style={[styles.actionBtn, { color:"red"}]}
                     onPress={handleDelete}
                   >
                     <Text style={{ color: "white", fontSize: 16 }}>Delete</Text>
@@ -810,55 +855,14 @@ export default function ChatScreen() {
               </View>
             </View>
           </Modal>
-        </View>
+        </ImageBackground>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#111" },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#212121",
-  },
-  profilePic: {
-    width: 50,
-    height: 50,
-    borderRadius: 50,
-    marginRight: 10,
-    borderColor: "#8cf728",
-    borderWidth: 2,
-  },
-  username: { color: "#fff", fontSize: 19, fontWeight: "500" },
-  status: { color: "rgba(213,213,213,1)", fontSize: 13 },
-  connectionIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#666',
-    marginRight: 6,
-  },
-  connectedDot: {
-    backgroundColor: '#4CAF50',
-  },
-  connectingDot: {
-    backgroundColor: '#FF9800',
-  },
-  errorDot: {
-    backgroundColor: '#F44336',
-  },
-  connectionText: {
-    color: '#999',
-    fontSize: 12,
-  },
+  container: { flex: 1 },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -913,10 +917,10 @@ const styles = StyleSheet.create({
   },
   messagesList: { flex: 1, paddingHorizontal: 12 },
   messageContainer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 18,
-    marginVertical: 4,
+    borderRadius: 50,
+    marginVertical: -1,
     maxWidth: "70%",
   },
   myMessage: { backgroundColor: "#d5ff5f", alignSelf: "flex-end" },
@@ -924,9 +928,11 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#222",
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    backgroundColor: "#000000",
+    borderTopWidth: 1,
+    borderTopColor: "#000000ff",
   },
   inputWrapper: { flex: 1, position: "relative", marginRight: 8 },
   input: {
@@ -934,16 +940,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#333",
     color: "white",
     borderRadius: 22,
-    paddingHorizontal: 15,
-    paddingRight: 40,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingRight: 80,
+    paddingVertical: 15,
     fontSize: 15,
+    minHeight: 50,
+    maxHeight: 100,
   },
-  emojiInside: {
+  inputIconsContainer: {
     position: "absolute",
     right: 10,
     top: "50%",
-    transform: [{ translateY: -12 }],
+    transform: [{ translateY: -13 }],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  inputIcon: {
+    padding: 2,
   },
   sendButton: {
     backgroundColor: "#d5ff5f",
@@ -983,15 +997,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteBox: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#090909ff",
+    borderWidth:1,
+    borderColor:"#2e2e2eff",
     padding: 25,
-    borderRadius: 35,
+    borderRadius: 20,
     width: "75%",
     alignItems: "center",
   },
   deleteTitle: {
     color: "white",
-    fontSize: 20,
+    fontFamily: 'Poppins_300Light',
+    fontSize: 18,
     fontWeight: "200",
     marginBottom: 20,
   },
@@ -1003,7 +1020,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 50,
     alignItems: "center",
     marginHorizontal: 5,
   },

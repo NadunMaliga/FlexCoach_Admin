@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,9 +6,8 @@ import {
     ScrollView,
     TouchableOpacity,
     Modal,
-    ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import {
     useFonts,
@@ -19,9 +18,8 @@ import {
 } from '@expo-google-fonts/poppins';
 import OfflineApiService from '../services/OfflineApiService';
 import Logger from '../utils/logger';
- 
+
 export default function ScheduleDetails() {
-    const router = useRouter();
     const { scheduleId, userId } = useLocalSearchParams();
 
     const [schedule, setSchedule] = useState(null);
@@ -87,11 +85,11 @@ export default function ScheduleDetails() {
                 >
                     {/* Title Skeleton */}
                     <View style={[styles.skeletonBox, { width: '60%', height: 50, alignSelf: 'center', marginBottom: 20 }]} />
-                    
+
                     {/* Description Skeleton */}
                     <View style={[styles.skeletonBox, { width: '80%', height: 14, alignSelf: 'center', marginBottom: 10 }]} />
                     <View style={[styles.skeletonBox, { width: '70%', height: 14, alignSelf: 'center', marginBottom: 30 }]} />
-                    
+
                     {/* Exercise Cards Skeleton */}
                     {[1, 2, 3, 4, 5].map((item) => (
                         <View key={item} style={styles.skeletonCard}>
@@ -110,13 +108,6 @@ export default function ScheduleDetails() {
     if (!schedule) {
         return (
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Feather name="arrow-left" size={24} color="#fff" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Schedule Details</Text>
-                    <View style={{ width: 24 }} />
-                </View>
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>Schedule not found</Text>
                 </View>
@@ -126,20 +117,6 @@ export default function ScheduleDetails() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Feather name="arrow-left" size={24} color="#fff" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Schedule Details</Text>
-                <TouchableOpacity
-                    onPress={() => router.push(`/AddSchedule?userId=${userId}&scheduleId=${scheduleId}&mode=edit`)}
-                    style={styles.editButton}
-                >
-                    <Feather name="edit-2" size={20} color="#d8d8d8ff" />
-                </TouchableOpacity>
-            </View>
-
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -193,7 +170,7 @@ export default function ScheduleDetails() {
             <Modal
                 visible={showExerciseModal}
                 transparent={true}
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={closeExerciseModal}
             >
                 <View style={styles.modalOverlay}>
@@ -266,26 +243,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#000',
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 15,
-        backgroundColor: '#000',
-    },
-    backButton: {
-        padding: 4,
-    },
-    headerTitle: {
-        fontSize: 20,
-        color: '#fff',
-        fontFamily: 'Poppins_300Light',
-    },
-    editButton: {
-        padding: 4,
     },
     scrollView: {
         flex: 1,

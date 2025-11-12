@@ -217,7 +217,7 @@ export default function Foods() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LoadingGif size={100} />
+        <LoadingGif size={200} />
       </View>
     );
   }

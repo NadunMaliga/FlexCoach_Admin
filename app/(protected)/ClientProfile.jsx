@@ -241,7 +241,7 @@ export default function ClientProfile() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
-        <LoadingGif size={100} />
+        <LoadingGif size={200} />
       </View>
     );
   }
@@ -406,9 +406,6 @@ export default function ClientProfile() {
               { label: "Account Active", value: user.isActive ? "Yes" : "No" },
               { label: "Approved", value: user.isApproved ? "Yes" : "No" },
               { label: "Approval Date", value: user.approvedAt ? formatDate(user.approvedAt) : "N/A" },
-              { label: "Primary Goal", value: user.fitnessGoals?.primaryGoal || "N/A" },
-              { label: "Target Weight", value: user.fitnessGoals?.targetWeight ? `${user.fitnessGoals.targetWeight} kg` : "N/A" },
-              { label: "Target Date", value: user.fitnessGoals?.targetDate ? formatDate(user.fitnessGoals.targetDate) : "N/A" },
               { label: "Current Steps", value: user.activity?.steps?.toString() || "0" },
               { label: "Steps Goal", value: user.activity?.stepsGoal?.toString() || "10000" },
             ].map((item, index) => (
@@ -478,7 +475,10 @@ export default function ClientProfile() {
 
       <TouchableOpacity
         style={styles.chatButton}
-        onPress={() => router.push(`/Chat?userId=${userId}`)} // navigate to Chat page with userId
+        onPress={() => {
+          const userName = user ? `${user.firstName} ${user.lastName}` : 'User';
+          router.push(`/Chat?userId=${userId}&userName=${encodeURIComponent(userName)}`);
+        }}
       >
         <Svg width={25} height={25} viewBox="0 0 24 24" fill="none" stroke="#707070ff" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M21 15C21 16.6569 19.6569 18 18 18H7L3 22V4C3 2.34315 4.34315 1 6 1H18C19.6569 1 21 2.34315 21 4V15Z" />
