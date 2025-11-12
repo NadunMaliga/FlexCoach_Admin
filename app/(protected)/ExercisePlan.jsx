@@ -1,5 +1,5 @@
 import {
-Poppins_400Regular,
+    Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
     useFonts,
@@ -23,6 +23,7 @@ import Svg, { Path } from "react-native-svg";
 import OfflineApiService from "../services/OfflineApiService";
 import ListSkeleton from '../components/ListSkeleton';
 import { showAlert, showSuccess, showError } from '../utils/customAlert';
+import HapticFeedback from '../utils/haptics';
 
 
 export default function ExercisePlan() {
@@ -66,7 +67,7 @@ export default function ExercisePlan() {
             setLoading(false);
             return;
         }
-        
+
         // Load data if no preloaded data available and haven't loaded yet
         if (userId && !hasLoadedOnce) {
             loadWorkoutSchedules();
@@ -424,6 +425,9 @@ export default function ExercisePlan() {
         };
 
         const handleDeletePress = () => {
+            // Haptic feedback on delete press
+            HapticFeedback.medium();
+
             // Animate out completely before calling delete
             Animated.parallel([
                 Animated.timing(translateX, {
@@ -479,33 +483,15 @@ export default function ExercisePlan() {
                         onPress();
                     }}>
                         <View style={styles.card}>
-                            {/* Left Icon */}
-                            <View style={styles.iconWrapper}>
-                                <Svg
-                                    width={30}
-                                    height={30}
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    strokeWidth={1.9}
-                                    stroke="#fff"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <Path d="M13 21H5C3.89543 21 3 20.1046 3 19V10H21V15M15 4V2M15 4V6M15 4H10.5" />
-                                    <Path d="M3 10V6C3 4.89543 3.89543 4 5 4H7" />
-                                    <Path d="M7 2V6" />
-                                    <Path d="M21 10V6C21 4.89543 20.1046 4 19 4H18.5" />
-                                    <Path d="M16 20L18 22L22 18" />
-                                </Svg>
-                            </View>
-
                             {/* Info */}
                             <View style={styles.infoContainer}>
-                                <Text style={styles.title}>
-                                    {item.name || item.day}
+                                <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+                                    {((item.name || item.day || 'Workout')?.length > 15
+                                        ? (item.name || item.day || 'Workout').substring(0, 20) + '...'
+                                        : (item.name || item.day || 'Workout'))}
                                 </Text>
-                                <Text style={styles.dateRange}>
-                                    {item.detail}
+                                <Text style={styles.dateRange} numberOfLines={1} ellipsizeMode="tail">
+                                    {(item.detail || 'No details')?.length > 18 ? (item.detail || 'No details').substring(0, 24) + '...' : (item.detail || 'No details')}
                                 </Text>
                                 {item.workoutType && (
                                     <Text style={styles.workoutType}>
@@ -517,9 +503,9 @@ export default function ExercisePlan() {
                             {/* Status Icon */}
                             <View style={{ marginRight: 10 }}>
                                 {item.isCompleted ? (
-                                    <Feather name="check-circle" size={20} color="#76f97aff" />
+                                    <Feather name="check-circle" size={20} color="#a8ffaaff" />
                                 ) : (
-                                    <Feather name="x-circle" size={20} color="#fd9191ff" />
+                                    <Feather name="x-circle" size={20} color="#ffadadff" />
                                 )}
                             </View>
 
@@ -534,7 +520,7 @@ export default function ExercisePlan() {
                                 }}
                                 style={{ marginRight: 10, padding: 4 }}
                             >
-                                <Feather name="edit-2" size={18} color="#d5ff5f" />
+                                <Feather name="edit-2" size={18} color="#c6c7c4ff" />
                             </TouchableOpacity>
 
                             {/* Right Arrow */}
@@ -570,16 +556,19 @@ export default function ExercisePlan() {
             const response = await OfflineApiService.deleteWorkoutSchedule(workoutId);
 
             if (response.success) {
-                showAlert('Success', '${workoutName} has been deleted successfully');
+                HapticFeedback.success();
+                showAlert('Success', `${workoutName} has been deleted successfully`);
             } else {
                 // Revert on failure
                 setSchedules(previousSchedules);
+                HapticFeedback.error();
                 showAlert('Error', 'Failed to delete workout schedule');
             }
         } catch (error) {
             Logger.error('Delete workout error:', error);
             // Revert on error
             setSchedules(previousSchedules);
+            HapticFeedback.error();
             showAlert('Error', 'Failed to delete workout schedule');
         }
     };
@@ -642,7 +631,7 @@ export default function ExercisePlan() {
                             key={item._id || index}
                             item={item}
                             index={index}
-                            onPress={() => router.push(`/ProfileSchedules?workoutId=${item._id}`)}
+                            onPress={() => router.push(`/ScheduleDetails?scheduleId=${item._id}&userId=${userId}`)}
                             onDelete={handleSwipeDelete}
                         />
                     ))
@@ -673,18 +662,11 @@ const styles = StyleSheet.create({
     card: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#1c1c1c",
-        borderRadius: 50,
-        padding: 17,
+        padding: 10,
+        marginBottom: 15,
         justifyContent: "space-between",
     },
-    iconWrapper: {
-        backgroundColor: "#3a3a3aff",
-        padding: 19,
-        borderRadius: 40,
-        justifyContent: "center",
-        alignItems: "center",
-    },
+
     text: {
         color: "#777",
         textAlign: "center",
@@ -693,23 +675,22 @@ const styles = StyleSheet.create({
         fontFamily: "Poppins_400Regular",
         fontSize: 14,
     },
-    infoContainer: { flex: 1, marginLeft: 15 },
+    infoContainer: { flex: 1 },
     title: {
         fontSize: 19,
-        color: "#fff",
-        fontFamily: "Poppins_500Medium",
+        color: "#a6a5a5ff",
+        fontFamily: "Poppins_300Light",
     },
-    dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_400Regular" },
+    dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_300Light" },
     workoutType: {
         fontSize: 12,
-        color: "#d5ff5f",
+        color: "#ddddddff",
         fontFamily: "Poppins_400Regular",
         marginTop: 2
     },
     errorContainer: {
         backgroundColor: "#1c1c1c",
         padding: 20,
-        borderRadius: 15,
         marginBottom: 20,
         alignItems: "center",
     },
@@ -723,7 +704,6 @@ const styles = StyleSheet.create({
         backgroundColor: "#d5ff5f",
         paddingHorizontal: 20,
         paddingVertical: 10,
-        borderRadius: 20,
     },
     retryButtonText: {
         color: "#000",
@@ -732,7 +712,6 @@ const styles = StyleSheet.create({
     noDataContainer: {
         backgroundColor: "#1c1c1c",
         padding: 30,
-        borderRadius: 15,
         marginTop: 20,
         alignItems: "center",
     },
@@ -748,7 +727,6 @@ const styles = StyleSheet.create({
         position: 'relative',
         marginBottom: 15,
         overflow: 'hidden',
-        borderRadius: 50,
         // Add subtle shadow for depth
         shadowColor: '#000',
         shadowOffset: {
@@ -760,8 +738,6 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     cardContainer: {
-        backgroundColor: "#1c1c1c",
-        borderRadius: 50,
         zIndex: 2,
     },
     deleteButtonContainer: {
@@ -774,7 +750,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         alignItems: 'center',
         backgroundColor: '#ff4444',
-        borderRadius: 50,
         paddingRight: 20,
         zIndex: 1,
         // Gradient-like effect with multiple backgrounds
@@ -784,7 +759,6 @@ const styles = StyleSheet.create({
     deleteIconContainer: {
         padding: 12,
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 25,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -794,7 +768,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 15,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 30,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.3)',
     },
@@ -804,16 +777,11 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "#d5ff5f",
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
         padding: 25,
         paddingVertical: 20,
-        borderTopWidth: 1,
-        borderTopColor: "#171717",
     },
     footerBtn: {
-        backgroundColor: "black",
+        backgroundColor: "#d5ff5f",
         paddingVertical: 22,
         borderRadius: 50,
         alignItems: "center",
@@ -822,7 +790,7 @@ const styles = StyleSheet.create({
     },
     footerBtnText: {
         fontSize: 18,
-        color: "#fff",
+        color: "#0000",
         fontFamily: "Poppins_400Regular",
         textAlign: "center",
     },

@@ -37,7 +37,7 @@ export default function Index() {
 
   return (
     <ImageBackground
-      source={{ uri: 'https://i.postimg.cc/hP4YVBWX/White-and-Black-Minimalist-Phone-Mockup-Instagram-Story.png' }}
+      source={require('../assets/images/homeimage.png')}
       style={styles.background}
       resizeMode="cover"
     >

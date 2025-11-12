@@ -80,8 +80,8 @@ export default function Foods() {
   const [fadeAnim] = React.useState(new Animated.Value(1));
 
   const [modalVisible, setModalVisible] = React.useState(false);
-  const [form, setForm] = React.useState({ 
-    name: "", 
+  const [form, setForm] = React.useState({
+    name: "",
     category: "Protein" as const,
     nutritionPer100g: {
       calories: 0,
@@ -105,7 +105,7 @@ export default function Foods() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Fade out while loading
       if (foods.length > 0) {
         Animated.timing(fadeAnim, {
@@ -114,11 +114,11 @@ export default function Foods() {
           useNativeDriver: true,
         }).start();
       }
-      
+
       const response = await OfflineApiService.getFoods({ limit: 100 });
       if (response.success) {
         setFoods(response.foods);
-        
+
         // Fade in with loaded data
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -157,7 +157,7 @@ export default function Foods() {
     try {
       setSaving(true);
       Logger.log('Sending food data:', form);
-      
+
       if (isEditing && selectedFood) {
         const response = await OfflineApiService.updateFood(selectedFood._id, form);
         if (response.success) {
@@ -177,8 +177,8 @@ export default function Foods() {
         }
       }
 
-      setForm({ 
-        name: "", 
+      setForm({
+        name: "",
         category: "Protein",
         nutritionPer100g: {
           calories: 0,
@@ -228,8 +228,8 @@ export default function Foods() {
         <Text style={{ color: '#ff6b6b', textAlign: 'center', margin: 20 }}>
           {error}
         </Text>
-        <TouchableOpacity 
-          style={styles.saveButton} 
+        <TouchableOpacity
+          style={styles.saveButton}
           onPress={loadFoods}
         >
           <Text style={styles.saveButtonText}>Retry</Text>
@@ -238,11 +238,8 @@ export default function Foods() {
     );
   }
 
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
-
   return (
     <View style={styles.container}>
-      <View style={{ height: statusBarHeight }} />
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
@@ -264,7 +261,7 @@ export default function Foods() {
 
           {/* Description */}
           <Text style={styles.text}>
-                    This client’s diet plan / foods will be updated here according to your schedule.
+            This client’s diet plan / foods will be updated here according to your schedule.
 
           </Text>
         </View>
@@ -279,11 +276,13 @@ export default function Foods() {
             }}
           >
             <View style={styles.card}>
-              
-
               <View style={styles.infoContainer}>
-                <Text style={styles.title}>{f.name}</Text>
-                <Text style={styles.dateRange}>{f.category}</Text>
+                <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+                  {f.name.length > 10 ? f.name.substring(0, 10) + '...' : f.name}
+                </Text>
+                <Text style={styles.dateRange} numberOfLines={1} ellipsizeMode="tail">
+                  {f.category.length > 18 ? f.category.substring(0, 18) + '...' : f.category}
+                </Text>
               </View>
 
               <View style={styles.rightContainer}>
@@ -304,8 +303,8 @@ export default function Foods() {
         onPress={() => {
           setModalVisible(true);
           setIsEditing(false);
-          setForm({ 
-            name: "", 
+          setForm({
+            name: "",
             category: "Protein",
             nutritionPer100g: {
               calories: 0,
@@ -322,17 +321,17 @@ export default function Foods() {
 
       {/* Add/Edit Food Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalContainer}
         >
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1} 
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
             onPress={() => setModalVisible(false)}
           >
             <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <ScrollView 
+              <ScrollView
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
@@ -379,8 +378,8 @@ export default function Foods() {
                     </ScrollView>
                   </View>
 
-                  <TouchableOpacity 
-                    style={[styles.saveButton, saving && { opacity: 0.7 }]} 
+                  <TouchableOpacity
+                    style={[styles.saveButton, saving && { opacity: 0.7 }]}
                     onPress={addFood}
                     disabled={saving}
                   >
@@ -435,8 +434,8 @@ export default function Foods() {
                   'Are you sure you want to delete this food?',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Delete', 
+                    {
+                      text: 'Delete',
                       style: 'destructive',
                       onPress: () => {
                         if (selectedFood) deleteFood(selectedFood);
@@ -478,34 +477,36 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1c1c1c",
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderRadius: 30,
+    backgroundColor: "#161616ff",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginBottom: 15,
+    marginTop: -5,
   },
-  searchInput: { 
-    flex: 1, 
-    color: "#fff", 
+  searchInput: {
+    flex: 1,
+    color: "#fff",
     fontSize: 17,
     paddingVertical: 5,
+    fontFamily: "Poppins_300Light",
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-     padding: 1,
+    padding: 1,
     marginBottom: 15,
     justifyContent: "space-between",
   },
   iconWrapper: {
-     padding: 19,
+    padding: 19,
     borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
   },
   infoContainer: { flex: 1, marginLeft: 15 },
-  title: { fontSize: 19, color: "#a6a5a5ff" },
-  dateRange: { fontSize: 14, color: "#999" },
+  title: { fontSize: 19, color: "#a6a5a5ff", fontFamily: "Poppins_300Light" },
+  dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_300Light" },
   rightContainer: { flexDirection: "row", alignItems: "center" },
   noDataText: { color: "#999", textAlign: "center", marginTop: 50 },
   addbutton: {
@@ -544,7 +545,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalBox: {
-    backgroundColor: "#1c1c1c",
+    backgroundColor: "#0b0b0bff",
     paddingVertical: 50,
     paddingHorizontal: 30,
     borderTopLeftRadius: 40,
@@ -555,14 +556,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 35,
   },
-  modalHeader: { fontSize: 25, color: "#fff", fontWeight: "500" },
+  modalHeader: { fontSize: 25, color: "#fff", fontWeight: "500", fontFamily: "Poppins_300Light" },
   modalInput: {
-    backgroundColor: "#292929",
+    backgroundColor: "#161616ff",
     fontSize: 15,
     color: "#fff",
-    borderRadius: 30,
+    borderRadius: 15,
     padding: 16,
-    marginBottom: 12,
+    paddingLeft: 20,
+    marginBottom: 11,
+    fontFamily: "Poppins_300Light",
+  },
+  textArea: {
+    height: 120,
+    borderRadius: 20,
+    paddingTop: 15,
+    paddingHorizontal: 18,
   },
   saveButton: {
     backgroundColor: "#d5ff5f",
@@ -571,7 +580,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
-  saveButtonText: { fontSize: 18, fontWeight: "400", color: "#000" },
+  saveButtonText: { fontSize: 18, fontWeight: "400", color: "#000", fontFamily: "Poppins_300Light" },
   actionBox: {
     backgroundColor: "#1c1c1c",
     padding: 20,
@@ -596,7 +605,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   categoryButtonActive: {
-    backgroundColor: "#d5ff5f",
+    backgroundColor: "#e3e3e3ff",
   },
   categoryText: {
     color: "#fff",

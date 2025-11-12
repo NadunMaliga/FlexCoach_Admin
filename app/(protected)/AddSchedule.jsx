@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -23,6 +24,7 @@ import {
 import Logger from '../utils/logger';
 import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
+import HapticFeedback from '../utils/haptics';
 import { showAlert, showSuccess, showError } from '../utils/customAlert';
 
 
@@ -92,7 +94,7 @@ export default function AddSchedule() {
         // Check both possible response structures
         const schedulesList = response.schedules || response.workoutSchedules || [];
         Logger.log('Schedules list:', schedulesList);
-        
+
         const scheduleToEdit = schedulesList.find(s => s._id === scheduleId);
 
         if (scheduleToEdit) {
@@ -253,9 +255,11 @@ export default function AddSchedule() {
 
       if (response.success) {
         Logger.log('Workout schedule saved successfully');
+        HapticFeedback.success();
         return true;
       } else {
         setSaveError('Failed to save workout schedule');
+        HapticFeedback.error();
         return false;
       }
     } catch (error) {
@@ -283,7 +287,9 @@ export default function AddSchedule() {
       setCurrentStep(currentStep + 1);
     } else {
       // Final step - save the workout schedule
+      setSaving(true);
       const saved = await saveWorkoutSchedule();
+      setSaving(false);
       if (saved) {
         router.back();
       }
@@ -514,7 +520,7 @@ export default function AddSchedule() {
                 }}
                 style={{ padding: 5 }}
               >
-                <Feather name="edit-2" size={18} color="#d5ff5f" />
+                <Feather name="edit-2" size={18} color="#d5d5d5ff" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -533,7 +539,7 @@ export default function AddSchedule() {
                 }}
                 style={{ padding: 5 }}
               >
-                <Feather name="trash-2" size={18} color="#ff6b6b" />
+                <Feather name="trash-2" size={18} color="#ff8282ff" />
               </TouchableOpacity>
             </View>
           </View>
@@ -636,10 +642,18 @@ export default function AddSchedule() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
-          <Text style={styles.nextBtnText}>
-            {currentStep === totalSteps ? (isEditMode ? "Update" : "Finish") : "Next"}
-          </Text>
+        <TouchableOpacity
+          style={[styles.nextBtn, saving && { opacity: 0.7 }]}
+          onPress={onNext}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <Text style={styles.nextBtnText}>
+              {currentStep === totalSteps ? (isEditMode ? "Update" : "Finish") : "Next"}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -660,7 +674,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: "white",
     fontSize: 20,
-    fontFamily: "Poppins_500Medium",
+    fontFamily: "Poppins_300Light",
   },
 
   text: {
@@ -668,7 +682,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 10,
     paddingVertical: 10,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light+",
     fontSize: 14,
   },
   stepIndicator: {
@@ -692,17 +706,18 @@ const styles = StyleSheet.create({
     color: "#aaa",
     marginTop: 10,
     fontSize: 13,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   stepTitle: {
     fontSize: 22,
     color: "#fff",
     marginBottom: 15,
+    fontFamily: "Poppins_300Light",
   },
   subTitle: {
     color: "#aaa",
     marginBottom: 15,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   input: {
     backgroundColor: "#1d1d1dff",
@@ -710,7 +725,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 15,
     color: "white",
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
     fontSize: 16,
     marginBottom: 15,
   },
@@ -723,7 +738,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
-  selectText: { color: "#fff", fontSize: 16 },
+  selectText: { color: "#fff", fontSize: 16, fontFamily: "Poppins_300Light" },
   addBtn: {
     backgroundColor: "black",
     borderColor: "#525252ff",
@@ -737,7 +752,7 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: "white",
     fontWeight: "600",
-    fontFamily: "Poppins_500Medium",
+    fontFamily: "Poppins_300Light",
   },
   exerciseItem: {
     backgroundColor: "#333",
@@ -753,16 +768,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#d5ff5f",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
     padding: 25,
     paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#171717ff",
   },
   nextBtn: {
-    backgroundColor: "black",
+    backgroundColor: "#d5ff5f",
     paddingVertical: 22,
     borderRadius: 50,
     alignItems: "center",
@@ -770,8 +780,8 @@ const styles = StyleSheet.create({
   },
   nextBtnText: {
     fontSize: 18,
-    color: "#ffffffff",
-    fontFamily: "Poppins_400Regular",
+    color: "#0000",
+    fontFamily: "Poppins_300Light",
     textAlign: "center",
   },
 
@@ -796,7 +806,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: "#fff",
     fontSize: 18,
-    fontFamily: "Poppins_500Medium",
+    fontFamily: "Poppins_300Light",
   },
   optionItem: {
     padding: 15,
@@ -806,19 +816,19 @@ const styles = StyleSheet.create({
   optionText: {
     color: "#fff",
     fontSize: 16,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   optionDescription: {
     color: "#999",
     fontSize: 12,
     marginTop: 2,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   optionMeta: {
     color: "#d5ff5f",
     fontSize: 11,
     marginTop: 4,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   loadingContainer: {
     padding: 40,
@@ -827,7 +837,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#999",
     marginTop: 10,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
   },
   errorContainer: {
     padding: 20,

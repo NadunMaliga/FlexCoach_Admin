@@ -1,5 +1,5 @@
 import {
-Poppins_400Regular,
+    Poppins_400Regular,
     Poppins_500Medium,
     useFonts,
 } from "@expo-google-fonts/poppins";
@@ -51,7 +51,7 @@ export default function DietPlan() {
 
     // Use the passed userId or fallback to test user ID for development
     const effectiveUserId = userId || "68e8fd08e8d1859ebd9edd05";
-    
+
     // Debug logging to verify userId is being passed correctly
     Logger.log('DietPlan - Received userId:', userId);
     Logger.log('DietPlan - Using effectiveUserId:', effectiveUserId);
@@ -170,63 +170,34 @@ export default function DietPlan() {
                 {/* Meals List */}
                 {meals.length > 0 ? (
                     meals.map((meal, index) => (
-                        <View key={index} style={styles.card}>
-                            <TouchableOpacity 
-                                style={styles.cardTouchable}
-                                onPress={() => openMealModal(meal)}
-                            >
-                                <View style={styles.iconWrapper}>
-                                    <Svg
-                                        width={30}
-                                        height={30}
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        strokeWidth={1.9}
-                                        stroke="#fff"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <Path d="M12.1471 21.2646L12 21.2351L11.8529 21.2646C9.47627 21.7399 7.23257 21.4756 5.59352 20.1643C3.96312 18.86 2.75 16.374 2.75 12C2.75 7.52684 3.75792 5.70955 5.08541 5.04581C5.77977 4.69863 6.67771 4.59759 7.82028 4.72943C8.96149 4.86111 10.2783 5.21669 11.7628 5.71153L12.0235 5.79841L12.2785 5.69638C14.7602 4.70367 16.9909 4.3234 18.5578 5.05463C20.0271 5.7403 21.25 7.59326 21.25 12C21.25 16.374 20.0369 18.86 18.4065 20.1643C16.7674 21.4756 14.5237 21.7399 12.1471 21.2646Z" />
-                                        <Path d="M12 5.5C12 3 11 2 9 2" />
-                                    </Svg>
-                                </View>
+                        <TouchableOpacity
+                            key={index}
+                            onPress={() => openMealModal(meal)}
+                        >
+                            <View style={styles.card}>
                                 <View style={styles.infoContainer}>
-                                    <Text style={styles.title}>{meal.name}</Text>
+                                    <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+                                        {meal.name.length > 15 ? meal.name.substring(0, 15) + '...' : meal.name}
+                                    </Text>
                                     <Text style={styles.dateRange}>Tap to view details</Text>
                                 </View>
-                                <Svg
-                                    width={18}
-                                    height={18}
-                                    viewBox="0 0 24 24"
-                                    strokeWidth={2}
-                                    stroke="#999"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <Path d="M9 18l6-6-6-6" />
-                                </Svg>
-                            </TouchableOpacity>
-                            {/* Edit Button */}
-                            <TouchableOpacity
-                                style={styles.editButton}
-                                onPress={() => {
-                                    if (meal._id) {
-                                        Logger.log('Editing diet plan with ID:', meal._id);
-                                        router.push(`/AddDiet?userId=${effectiveUserId}&dietId=${meal._id}&mode=edit`);
-                                    } else {
-                                        Logger.error('No diet ID found for meal:', meal);
-                                        Alert.alert(
-                                            'Cannot Edit',
-                                            'This diet plan cannot be edited because it has no ID.',
-                                            [{ text: 'OK' }]
-                                        );
-                                    }
-                                }}
-                            >
-                                <Feather name="edit-2" size={18} color="#d5ff5f" />
-                            </TouchableOpacity>
-                        </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <TouchableOpacity
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            if (meal._id) {
+                                                Logger.log('Editing diet plan with ID:', meal._id);
+                                                router.push(`/AddDiet?userId=${effectiveUserId}&dietId=${meal._id}&mode=edit`);
+                                            }
+                                        }}
+                                        style={{ marginRight: 10, padding: 4 }}
+                                    >
+                                        <Feather name="edit-2" size={18} color="#9a9a9aff" />
+                                    </TouchableOpacity>
+                                    <Feather name="chevron-right" size={20} color="#999" />
+                                </View>
+                            </View>
+                        </TouchableOpacity>
                     ))
                 ) : (
                     <View style={styles.emptyState}>
@@ -311,44 +282,18 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#000" },
     card: {
         flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#1c1c1c",
-        borderRadius: 50,
+        alignItems: "flex-start",
+        padding: 10,
         marginBottom: 15,
-        position: "relative",
-    },
-    cardTouchable: {
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 17,
-        paddingRight: 60, // Make room for edit button
-        flex: 1,
         justifyContent: "space-between",
-    },
-    editButton: {
-        position: "absolute",
-        right: 15,
-        top: "50%",
-        transform: [{ translateY: -12 }],
-        padding: 8,
-        backgroundColor: "#2a2a2a",
-        borderRadius: 20,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    iconWrapper: {
-        backgroundColor: "#3a3a3aff",
-        padding: 15,
-        borderRadius: 40,
-        justifyContent: "center",
-        alignItems: "center",
+        width: '100%',
     },
     text: {
         color: "#777",
         textAlign: "center",
         paddingHorizontal: 20,
         paddingVertical: 10,
-        fontFamily: "Poppins_400Regular",
+        fontFamily: "Poppins_300Light",
         fontSize: 14,
     },
     mtext: {
@@ -357,26 +302,23 @@ const styles = StyleSheet.create({
         fontFamily: "Poppins_400Regular",
         fontSize: 25,
     },
-    infoContainer: { flex: 1, marginLeft: 15 },
+    infoContainer: { flex: 1, marginRight: 10 },
     title: {
         fontSize: 19,
-        color: "#fff",
-        fontFamily: "Poppins_500Medium",
+        color: "#a6a5a5ff",
+        fontFamily: "Poppins_300Light",
     },
-    dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_400Regular" },
+    dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_300Light" },
     footer: {
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "#d5ff5f",
         padding: 25,
         paddingVertical: 20,
-        borderTopWidth: 1,
-        borderTopColor: "#171717ff",
     },
     footerBtn: {
-        backgroundColor: "black",
+        backgroundColor: "#d5ff5f",
         paddingVertical: 22,
         borderRadius: 50,
         alignItems: "center",
@@ -385,25 +327,28 @@ const styles = StyleSheet.create({
     },
     footerBtnText: {
         fontSize: 18,
-        color: "#ffffffff",
-        fontFamily: "Poppins_400Regular",
+        color: "#000",
+        fontFamily: "Poppins_300Light",
         textAlign: "center",
     },
     floatingAddBtn: {
         position: "absolute",
-        bottom: 150, // a little above the footer
-        right: 25,
-        backgroundColor: "#d5ff5f",
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: "center",
+        bottom: 150,
+        right: 20,
+        backgroundColor: "#dcff7c",
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         justifyContent: "center",
+        alignItems: "center",
+        zIndex: 100,
     },
     addBtnText: {
-        fontSize: 35,
-        color: "black", // matching footer color
+        fontSize: 40,
+        color: "black",
+        fontWeight: "300",
     },
+
     modalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.7)",

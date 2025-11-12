@@ -51,6 +51,13 @@ export default function SignIn() {
   };
 
   const onSignIn = async () => {
+    // Check if password is empty and show error
+    if (!password.trim()) {
+      setError("Password is required");
+      HapticFeedback.error();
+      return;
+    }
+
     const err = validate(password);
     setError(err);
     if (err) {
@@ -81,22 +88,22 @@ export default function SignIn() {
     }
   };
 
-  const isDisabled = submitting || !password || !!error;
+  const isDisabled = submitting;
 
   const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
 
   return (
-    <View style={styles.container}>
-      <View style={{ height: statusBarHeight }} />
-      <Text style={styles.header}>Verify You</Text>
-      <Text style={styles.secondheader}>
-        Enter the password given to you{"\n"} by the admin.
-      </Text>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={0}
+    >
+      <View style={styles.container}>
+        <View style={{ height: statusBarHeight }} />
+        <Text style={styles.header}>Verify You</Text>
+        <Text style={styles.secondheader}>
+          Enter the password given to you{"\n"} by the admin.
+        </Text>
         <ScrollView
           contentContainerStyle={styles.form}
           keyboardShouldPersistTaps="handled"
@@ -114,7 +121,12 @@ export default function SignIn() {
               value={password}
               onChangeText={(t) => {
                 setPassword(t);
-                setError(validate(t));
+                // Only validate if user has started typing
+                if (t.trim()) {
+                  setError(validate(t));
+                } else {
+                  setError(null);
+                }
               }}
             />
             <TouchableOpacity onPress={() => setSecure((s) => !s)}>
@@ -127,49 +139,49 @@ export default function SignIn() {
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      {/* Footer — Sign In */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.nextButton,]}
-          onPress={onSignIn}
-          disabled={isDisabled}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.nextButtonText}>Next</Text>
-          )}
-        </TouchableOpacity>
+        {/* Footer — Sign In */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.nextButton,]}
+            onPress={onSignIn}
+            disabled={isDisabled}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <Text style={styles.nextButtonText}>Next</Text>
+            )}
+          </TouchableOpacity>
 
-        {/* Go to Sign Up (optional) */}
-        <TouchableOpacity
-          style={{ marginTop: 14, alignItems: "center" }}
-          onPress={() => router.push("/signin")}
-        >
-          <Text style={{ color: "#757575ff", fontFamily: "Poppins_400Regular" }}>
-            Already have an account? <Text style={{ color: "#000000ff" }}>Sign in</Text>
-          </Text>
-        </TouchableOpacity>
+          {/* Go to Sign Up (optional) */}
+          <TouchableOpacity
+            style={{ marginTop: 14, alignItems: "center" }}
+            onPress={() => router.push("/signin")}
+          >
+            <Text style={{ color: "#757575ff", fontFamily: "Poppins_400Regular" }}>
+              Already have an account? <Text style={{ color: "#d5ff5f" }}>Sign in</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   header: {
-    fontSize: 39,
+    fontSize: 31,
     fontFamily: "Poppins_600SemiBold",
     color: "white",
     textAlign: "center",
-    marginVertical: 20,
+    marginTop: 50,
+    marginBottom: 5,
   },
   secondheader: {
     textAlign: "center",
-    marginVertical: 20,
-    marginTop: -20,
+    marginBottom: 20,
     fontSize: 17,
     color: "#8f8f8fff",
     paddingHorizontal: 15,
@@ -193,11 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#d5ff5f",
+    backgroundColor: "black",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 25,
@@ -206,7 +214,7 @@ const styles = StyleSheet.create({
     borderTopColor: "#171717ff",
   },
   nextButton: {
-    backgroundColor: "black",
+    backgroundColor: "#d5ff5f",
     paddingVertical: 22,
     borderRadius: 50,
     alignItems: "center",
@@ -214,7 +222,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     fontSize: 18,
-    color: "#ffffffff",
+    color: "black",
     fontFamily: "Poppins_300Light",
     textAlign: "center",
   },

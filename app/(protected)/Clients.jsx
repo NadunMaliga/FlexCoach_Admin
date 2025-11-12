@@ -3,25 +3,25 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Svg, { Path } from "react-native-svg";
 
 import {
-Poppins_300Light,
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    useFonts,
+  Poppins_300Light,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
 import {
-    Animated,
-    Image,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    Platform,
-    StatusBar,
+  Animated,
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Platform,
+  StatusBar,
 } from "react-native";
 import Logger from '../utils/logger';
 import OfflineApiService from "../services/OfflineApiService";
@@ -97,7 +97,7 @@ export default function Clients({ initialFilter = "All" }) {
     const now = Date.now();
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     const paramsChanged = lastParams.filter !== filter || lastParams.search !== searchText;
-    
+
     if (paramsChanged || users.length === 0 || now - lastLoadTime > CACHE_DURATION) {
       loadUsers();
       setLastParams({ filter, search: searchText });
@@ -142,18 +142,18 @@ export default function Clients({ initialFilter = "All" }) {
 
       if (response.success) {
         Logger.log(`📋 Loaded ${response.users.length} users`);
-        
+
         // Fetch profile photos from UserProfiles for each user
         const usersWithProfiles = await Promise.all(
           response.users.map(async (user) => {
             try {
               const profileResponse = await OfflineApiService.getUserProfile(user._id);
-              const profilePhoto = profileResponse.success 
-                ? profileResponse.userProfile.profilePhoto 
+              const profilePhoto = profileResponse.success
+                ? profileResponse.userProfile.profilePhoto
                 : null;
-              
+
               const finalProfilePhoto = profilePhoto || user.profilePhoto;
-              
+
               return {
                 id: user._id,
                 firstName: user.firstName,
@@ -183,9 +183,9 @@ export default function Clients({ initialFilter = "All" }) {
             }
           })
         );
-        
+
         setUsers(usersWithProfiles);
-        
+
         // Fade in with new data
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -258,11 +258,8 @@ export default function Clients({ initialFilter = "All" }) {
     }
   };
 
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
-
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <View style={{ height: statusBarHeight }} />
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <SearchIcon size={25} color="#999" />
@@ -296,7 +293,7 @@ export default function Clients({ initialFilter = "All" }) {
                 styles.filterText,
                 filter === item && {
                   color: "#000",
-                  fontFamily: "Poppins_600SemiBold",
+                  fontFamily: "Poppins_300Light",
                 },
               ]}
             >
@@ -319,13 +316,13 @@ export default function Clients({ initialFilter = "All" }) {
             Error: {error}
           </Text>
         )}
-        
+
         {/* Show skeleton loader only when loading and no data */}
         {loading && users.length === 0 && (
           <View>
             {[1, 2, 3, 4, 5].map((item) => (
               <View key={item} style={styles.skeletonCard}>
-                <Animated.View 
+                <Animated.View
                   style={[
                     styles.skeletonAvatar,
                     {
@@ -334,10 +331,10 @@ export default function Clients({ initialFilter = "All" }) {
                         outputRange: [0.5, 0.8],
                       })
                     }
-                  ]} 
+                  ]}
                 />
                 <View style={{ flex: 1 }}>
-                  <Animated.View 
+                  <Animated.View
                     style={[
                       styles.skeletonName,
                       {
@@ -346,9 +343,9 @@ export default function Clients({ initialFilter = "All" }) {
                           outputRange: [0.5, 0.8],
                         })
                       }
-                    ]} 
+                    ]}
                   />
-                  <Animated.View 
+                  <Animated.View
                     style={[
                       styles.skeletonDate,
                       {
@@ -357,10 +354,10 @@ export default function Clients({ initialFilter = "All" }) {
                           outputRange: [0.5, 0.8],
                         })
                       }
-                    ]} 
+                    ]}
                   />
                 </View>
-                <Animated.View 
+                <Animated.View
                   style={[
                     styles.skeletonBadge,
                     {
@@ -369,13 +366,13 @@ export default function Clients({ initialFilter = "All" }) {
                         outputRange: [0.5, 0.8],
                       })
                     }
-                  ]} 
+                  ]}
                 />
               </View>
             ))}
           </View>
         )}
-        
+
         {!loading && filteredUsers.map((user) => (
           <TouchableOpacity
             key={user.id}
@@ -384,7 +381,7 @@ export default function Clients({ initialFilter = "All" }) {
               HapticFeedback.light(); // Light tap feedback
               // Preload exercise and diet data in the background for instant tab switching
               Logger.log('🚀 Preloading data for user:', user.id);
-              
+
               // Start both API calls in parallel (don't await)
               const exercisePromise = OfflineApiService.getUserWorkoutSchedules(user.id, {
                 limit: 50,
@@ -454,7 +451,7 @@ export default function Clients({ initialFilter = "All" }) {
               Promise.all([exercisePromise, dietPromise]).then(([exerciseData, dietData]) => {
                 router.push({
                   pathname: "/ClientProfile",
-                  params: { 
+                  params: {
                     userId: user.id,
                     user: JSON.stringify(user.userData || user),
                     preloadedExerciseData: JSON.stringify(exerciseData),
@@ -464,8 +461,8 @@ export default function Clients({ initialFilter = "All" }) {
               });
             }}
           >
-            <ProfileAvatar 
-              user={user} 
+            <ProfileAvatar
+              user={user}
               size={60}
               style={styles.avatar}
             />
@@ -578,17 +575,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1c1c1c",
+    backgroundColor: "#161616ff",
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 40,
+    paddingVertical: 8,
+    borderRadius: 20,
     margin: 10,
   },
   searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
     color: "#fff",
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
     fontSize: 17,
     paddingVertical: 5,
   },
@@ -603,16 +600,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 20,
     borderRadius: 20,
-    borderColor: "#848484ff",
+    borderColor: "#5c5c5cff",
     borderWidth: 1,
     marginRight: 5,
   },
   filterButtonActive: {
     backgroundColor: "#d5ff5f",
+    fontFamily: "Poppins_300Light",
     borderColor: "#d5ff5f",
   },
   filterText: {
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
     color: "#fff",
     fontSize: 16,
   },
@@ -628,12 +626,14 @@ const styles = StyleSheet.create({
   userName: {
     color: "#d4d3d3ff",
     fontSize: 18,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
+    maxWidth: '70%',
   },
   userJoined: {
     color: "#aaa",
     fontSize: 13,
     fontFamily: "Poppins_300Light",
+    marginTop: -3,
   },
   statusBadge: {
     paddingVertical: 5,
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_500Medium",
   },
-  
+
   // Skeleton styles
   skeletonCard: {
     flexDirection: "row",

@@ -1,14 +1,19 @@
 import { Stack, useRouter } from 'expo-router';
-import { TouchableOpacity, Platform, StatusBar } from 'react-native';
+import { TouchableOpacity, StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/customAlert';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProtectedLayout() {
   const router = useRouter();
   const { logout } = useAuth();
-  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    // Set status bar to match header
+    StatusBar.setBarStyle('light-content');
+    StatusBar.setBackgroundColor('#000000');
+  }, []);
 
   const handleLogout = () => {
     showConfirm(
@@ -21,7 +26,6 @@ export default function ProtectedLayout() {
         router.replace('/signin');
       },
       () => {
-        // Cancel - do nothing
       }
     );
   };
@@ -34,22 +38,28 @@ export default function ProtectedLayout() {
       accessibilityLabel="Settings and logout"
       accessibilityHint="Opens settings menu with logout option"
     >
-      <Feather name="log-out" size={22} color="#d5ff5f" />
+      <Feather name="log-out" size={22} color="#9c9c9cff" />
     </TouchableOpacity>
   );
 
   return (
     <Stack screenOptions={{
       headerShown: true,
-      headerStyle: { 
+      headerStyle: {
         backgroundColor: '#000',
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
       },
+      headerShadowVisible: false,
       headerTintColor: '#fff',
-      headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+      headerTitleAlign: 'center',
+      headerTitleStyle: { fontWeight: '600', fontSize: 18, fontFamily: 'Poppins_300Light' },
       headerRight: () => <SettingsButton />,
       contentStyle: { backgroundColor: '#000', paddingTop: 0 },
       animation: 'fade',
-      headerStatusBarHeight: Platform.OS === 'android' ? StatusBar.currentHeight : insets.top,
+      headerStatusBarHeight: 0,
     }}>
       <Stack.Screen
         name="Home"
@@ -76,6 +86,13 @@ export default function ProtectedLayout() {
         name="Exercise"
         options={{
           title: 'Exercises',
+          headerShown: false // Exercise is part of Home tabs
+        }}
+      />
+      <Stack.Screen
+        name="ScheduleDetails"
+        options={{
+          title: 'ScheduleDetails',
           headerShown: false // Exercise is part of Home tabs
         }}
       />
@@ -114,7 +131,7 @@ export default function ProtectedLayout() {
         name="AddSchedule"
         options={{
           title: 'Add Schedule',
-          headerShown: false // Hide default header, using custom header in component
+          headerShown: false
         }}
       />
       <Stack.Screen

@@ -23,6 +23,7 @@ import OfflineApiService from "../services/OfflineApiService";
 import ListSkeleton from '../components/ListSkeleton';
 import LoadingGif from '../components/LoadingGif';
 import { showAlert, showSuccess, showError } from '../utils/customAlert';
+import HapticFeedback from '../utils/haptics';
 
 
 // SVG Icons
@@ -193,15 +194,19 @@ export default function ProfileSchedules() {
 
   const deleteExercise = async (exercise: Exercise) => {
     try {
+      HapticFeedback.medium();
       const response = await OfflineApiService.deleteExercise(exercise._id);
       if (response.success) {
         await loadExercises(); // Reload exercises
+        HapticFeedback.success();
         showAlert('Success', 'Exercise deleted successfully');
       } else {
+        HapticFeedback.error();
         showAlert('Error', 'Failed to delete exercise');
       }
     } catch (error) {
       Logger.error('Delete exercise error:', error);
+      HapticFeedback.error();
       showAlert('Error', 'Failed to delete exercise');
     }
   };
@@ -209,7 +214,7 @@ export default function ProfileSchedules() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LoadingGif size={100} />
+        <LoadingGif size={200} />
       </View>
     );
   }
@@ -230,11 +235,8 @@ export default function ProfileSchedules() {
     );
   }
 
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
-
   return (
     <View style={styles.container}>
-      <View style={{ height: statusBarHeight }} />
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
@@ -256,7 +258,7 @@ export default function ProfileSchedules() {
 
           {/* Description */}
           <Text style={styles.text}>
-            Manage exercises that will be available for workout plans.
+            Manage exercises that will be available{'\n'}for workouts.
           </Text>
         </View>
 
@@ -270,31 +272,14 @@ export default function ProfileSchedules() {
             }}
           >
             <View style={styles.card}>
-              <View style={styles.iconWrapper}>
-                <Svg
-                  width={28}
-                  height={28}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth={1.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <Path d="M7.4 7H4.6C4.26863 7 4 7.26863 4 7.6V16.4C4 16.7314 4.26863 17 4.6 17H7.4C7.73137 17 8 16.7314 8 16.4V7.6C8 7.26863 7.73137 7 7.4 7Z" />
-                  <Path d="M19.4 7H16.6C16.2686 7 16 7.26863 16 7.6V16.4C16 16.7314 16.2686 17 16.6 17H19.4C19.7314 17 20 16.7314 20 16.4V7.6C20 7.26863 19.7314 7 19.4 7Z" />
-                  <Path d="M1 14.4V9.6C1 9.26863 1.26863 9 1.6 9H3.4C3.73137 9 4 9.26863 4 9.6V14.4C4 14.7314 3.73137 15 3.4 15H1.6C1.26863 15 1 14.7314 1 14.4Z" />
-                  <Path d="M23 14.4V9.6C23 9.26863 22.7314 9 22.4 9H20.6C20.2686 9 20 9.26863 20 9.6V14.4C20 14.7314 20.2686 15 20.6 15H22.4C22.7314 15 23 14.7314 23 14.4Z" />
-                  <Path d="M8 12H16" />
-                </Svg>
-              </View>
-
               <View style={styles.infoContainer}>
-                <Text style={styles.title}>{ex.name}</Text>
-                <Text style={styles.dateRange}>
-                  {ex.description && ex.description.length > 25
-                    ? ex.description.substring(0, 25) + "..."
-                    : ex.description || 'No description'}
+                <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+                  {ex.name.length > 10 ? ex.name.substring(0, 10) + '...' : ex.name}
+                </Text>
+                <Text style={styles.dateRange} numberOfLines={1} ellipsizeMode="tail">
+                  {ex.description
+                    ? (ex.description.length > 18 ? ex.description.substring(0, 18) + '...' : ex.description)
+                    : 'No description'}
                 </Text>
               </View>
 
@@ -472,37 +457,37 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1c1c1c",
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderRadius: 30,
+    backgroundColor: "#161616ff",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginBottom: 15,
+    marginTop: -5,
   },
   searchInput: {
     flex: 1,
     color: "#fff",
     fontSize: 17,
     paddingVertical: 5,
+    fontFamily: "Poppins_300Light",
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1c1c1c",
-    borderRadius: 50,
-    padding: 17,
+    padding: 1,
     marginBottom: 15,
+    justifyContent: "space-between",
     justifyContent: "space-between",
   },
   iconWrapper: {
-    backgroundColor: "#3a3a3a",
     padding: 19,
     borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
   },
-  infoContainer: { flex: 1, marginLeft: 15 },
-  title: { fontSize: 19, color: "#fff" },
-  dateRange: { fontSize: 14, color: "#999" },
+  infoContainer: { flex: 1, marginLeft: 15, },
+  title: { fontSize: 19, color: "#a6a5a5ff", fontFamily: "Poppins_300Light" },
+  dateRange: { fontSize: 14, color: "#999", fontFamily: "Poppins_300Light" },
   rightContainer: { flexDirection: "row", alignItems: "center" },
   noDataText: { color: "#999", textAlign: "center", marginTop: 50 },
   addbutton: {
@@ -543,7 +528,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalBox: {
-    backgroundColor: "#1c1c1c",
+    backgroundColor: "#0b0b0bff",
     paddingVertical: 50,
     paddingHorizontal: 30,
     borderTopLeftRadius: 40,
@@ -554,14 +539,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 35,
   },
-  modalHeader: { fontSize: 25, color: "#fff", fontWeight: "500" },
+  modalHeader: { fontSize: 25, color: "#fff", fontWeight: "500", fontFamily: "Poppins_300Light" },
   modalInput: {
-    backgroundColor: "#292929",
+    backgroundColor: "#161616ff",
     fontSize: 15,
     color: "#fff",
-    borderRadius: 30,
+    borderRadius: 15,
     padding: 16,
-    marginBottom: 12,
+    paddingLeft:20,
+    marginBottom: 11,
+    fontFamily: "Poppins_300Light",
   },
   textArea: {
     height: 120,
@@ -576,7 +563,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
-  saveButtonText: { fontSize: 18, fontWeight: "400", color: "#000" },
+  saveButtonText: { fontSize: 18, fontWeight: "400", color: "#000", fontFamily: "Poppins_300Light" },
 
   actionBox: {
     backgroundColor: "#1c1c1c",
@@ -593,5 +580,6 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 18,
     color: "#a2a1a1ff",
+    fontFamily: "Poppins_300Light",
   },
 });

@@ -8,7 +8,7 @@ import Logger from '../utils/logger';
  */
 
 // Detect if we're in development mode
-const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+const isDev = typeof _DEV_ !== 'undefined' ? _DEV_ : false;
 
 // TEMPORARY: Force production URLs even in development for VPS testing
 const forceProduction = true;
@@ -18,8 +18,8 @@ const ENV = {
   development: {
     // Development - Use your local machine's IP address
     // Update this IP if your network changes
-    API_URL: 'http://172.28.26.234:3001',
-    CHAT_URL: 'http://172.28.26.234:5000',
+    API_URL: 'https://admin.flexcoach.publicvm.com',
+    CHAT_URL: 'https://chat.flexcoach.publicvm.com',
     
     // Development settings
     API_TIMEOUT: 10000, // 10 seconds
@@ -103,5 +103,5 @@ export default {
   ENABLE_DEBUG,
   isDev,
   currentEnv,
-  logConfig
+  logConfig
 };

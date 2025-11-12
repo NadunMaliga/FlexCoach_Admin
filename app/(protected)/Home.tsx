@@ -296,7 +296,7 @@ export default function Home() {
                   transform: [{ scale: tabIconAnims[tabs.findIndex(t => t.name === tab.name)] }]
                 }}
               >
-                {tab.svg(isActive ? "#d5ff5f" : "#fff", 28)}
+                {tab.svg(isActive ? "#d5ff5f" : "#9f9f9fff", 28)}
               </AnimatedView>
               <Text style={[styles.navText, isActive && { color: "#d5ff5f" }]}>
                 {tab.label}
@@ -331,10 +331,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-evenly",
     alignItems: "center",
-    backgroundColor: "rgba(44, 44, 44, 1)",
+    backgroundColor: "rgba(21, 21, 21, 1)",
     paddingVertical: 12,
     paddingHorizontal: 15,
-    borderRadius: 40,
+    borderRadius: 50,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 3 },

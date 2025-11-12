@@ -15,6 +15,7 @@ import {
   View,
   Platform,
   StatusBar,
+  BlurView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -22,6 +23,7 @@ import * as SecureStore from 'expo-secure-store';
 import Logger from '../utils/logger';
 import { LineChart } from "react-native-chart-kit";
 import Svg, { Path } from "react-native-svg";
+import Icon from "react-native-vector-icons/Feather";
 import { useAuth } from "../contexts/AuthContext";
 import OfflineApiService from "../services/OfflineApiService";
 import DashboardSkeleton from '../components/DashboardSkeleton';
@@ -343,19 +345,19 @@ export default function Dashboard({ onNavigateToClients }: DashboardProps) {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
-        <LoadingGif size={100} />
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
+        <LoadingGif size={200} />
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: "#000", justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: '#ff6b6b', textAlign: 'center', margin: 20 }}>
           Error loading dashboard: {error}
         </Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -394,12 +396,8 @@ export default function Dashboard({ onNavigateToClients }: DashboardProps) {
       datasets: [{ data: [1000, 1050, 1080, 1100, 1130, 1150, 1200] }]
     };
 
-  const statusBarHeight = Platform.OS === 'android' ? 
-    (StatusBar.currentHeight || 0) : 44;
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
-      <View style={{ height: statusBarHeight }} />
+    <View style={{ flex: 1, backgroundColor: "#000" }}>
       <Animated.ScrollView
         style={[styles.container, { opacity: fadeAnim }]}
         contentContainerStyle={{ paddingBottom: 180 }} // extra space for navbar
@@ -408,8 +406,8 @@ export default function Dashboard({ onNavigateToClients }: DashboardProps) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#d5ff5f"
-            colors={["#d5ff5f"]}
+            tintColor="#000000ff"
+            colors={["#000000ff"]}
           />
         }
       >
@@ -576,7 +574,7 @@ export default function Dashboard({ onNavigateToClients }: DashboardProps) {
                 onError={(error) => Logger.log('❌ Dashboard avatar error for:', user.name, error.nativeEvent.error)}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">{user.name}</Text>
                 <Text style={styles.userJoined}>Joined {user.daysAgo} days ago</Text>
               </View>
               {/* Status Badge */}
@@ -644,7 +642,7 @@ export default function Dashboard({ onNavigateToClients }: DashboardProps) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -658,13 +656,13 @@ const styles = StyleSheet.create({
     marginRight: 15,
     position: "relative"
   },
-  measureName: { fontSize: 18, fontWeight: "300", color: "#fff", marginBottom: 5 },
-  measureValue: { fontSize: 30, fontWeight: "400", color: "#f2f2f2ff", marginTop: 10 },
-  measureUpdated: { fontSize: 13, color: "#999", fontWeight: "300", marginTop: 5 },
+  measureName: { fontSize: 18, fontWeight: "300", color: "#fff", marginBottom: 5, fontFamily: "Poppins_300Light" },
+  measureValue: { fontSize: 35, fontWeight: "400", color: "#f2f2f2ff", marginTop: -8, fontFamily: "Poppins_300Light" },
+  measureUpdated: { fontSize: 13, color: "#999", fontWeight: "300", marginTop: -2, fontFamily: "Poppins_300Light" },
   arrowIcon: {
     position: "absolute",
     padding: 13,
-    bottom: 10,
+    bottom: 25,
     right: 20,
     backgroundColor: "#171717ff",
     borderRadius: 20
@@ -675,7 +673,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  sectionTitle: { color: "white", fontSize: 20, fontWeight: "300", marginBottom: 10 },
+  sectionTitle: { color: "#bbbbbbff", fontSize: 20, fontWeight: "300", marginBottom: 1, fontFamily: "Poppins_300Light" },
   userRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -684,8 +682,8 @@ const styles = StyleSheet.create({
     marginBottom: 5
   },
   avatar: { width: 60, height: 60, borderRadius: 50, marginRight: 15 },
-  userName: { color: "white", fontSize: 19, fontWeight: "400" },
-  userJoined: { color: "#aaa", fontSize: 13 },
+  userName: { color: "white", fontSize: 19, fontWeight: "400", fontFamily: "Poppins_300Light", maxWidth: '70%' },
+  userJoined: { color: "#aaa", fontSize: 13, marginTop: -7, fontFamily: "Poppins_300Light" },
   statusBadge: {
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -694,7 +692,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   active: {
-    backgroundColor: "#a2f4a6ff",
+    backgroundColor: "#ffffffff",
   },
   inactive: {
     backgroundColor: "#555",
@@ -702,6 +700,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 13,
     fontWeight: "400",
+    fontFamily: "Poppins_300Light",
   },
   // Greeting
   greetingContainer: {
@@ -723,8 +722,8 @@ const styles = StyleSheet.create({
     borderColor: "black",
   },
   greetingTextContainer: { marginLeft: 10 },
-  helloText: { fontSize: 23, fontWeight: "600", color: "#eaeaea" },
-  startDayText: { fontSize: 15, color: "#939393" },
+  helloText: { fontSize: 23, fontWeight: "600", color: "#eaeaea", fontFamily: "Poppins_300Light" },
+  startDayText: { fontSize: 15, color: "#939393", marginTop: -9, fontFamily: "Poppins_300Light" },
   // Profile Modal
   modalOverlay: {
     flex: 1,
@@ -744,11 +743,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "600",
     marginBottom: 8,
+    fontFamily: "Poppins_300Light",
   },
   modalSubtitle: {
     color: "#999",
     fontSize: 14,
     marginBottom: 25,
+    fontFamily: "Poppins_300Light",
   },
   modalProfilePic: {
     width: 120,
@@ -781,10 +782,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "500",
+    fontFamily: "Poppins_300Light",
   },
   changeButtonText: {
     color: "#000",
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: "Poppins_300Light",
   },
 });

@@ -119,7 +119,7 @@ export default function ClientProfile() {
         Logger.error('Error parsing preloaded exercise data:', e);
       }
     }
-    
+
     if (preloadedDietData) {
       try {
         const parsed = JSON.parse(preloadedDietData);
@@ -279,11 +279,8 @@ export default function ClientProfile() {
     router.push(`/MeasurementHistory?measurement=${key}&userId=${userId}`);
   };
 
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44;
-
   return (
     <View style={styles.container}>
-      <View style={{ height: statusBarHeight }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {/* Profile Header - Centered */}
         <View style={{ alignItems: 'center', width: '100%' }}>
@@ -602,7 +599,7 @@ export default function ClientProfile() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black", paddingTop: 3, paddingBottom: 60, },
+  container: { flex: 1, backgroundColor: "black", paddingBottom: 60, },
   visible: { flex: 1 },
   hidden: { flex: 1, position: 'absolute', left: -9999 },
   profilePic: {
@@ -710,16 +707,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#d5ff5f",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    backgroundColor: "transparent",
     padding: 25,
     paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#171717ff",
   },
   footerBtn: {
-    backgroundColor: "black",
+    backgroundColor: "#d5ff5f",
     paddingVertical: 22,
     borderRadius: 50,
     alignItems: "center",
@@ -729,7 +722,7 @@ const styles = StyleSheet.create({
   footerBtnText: {
 
     fontSize: 18,
-    color: "#ffffffff",
+    color: "#000000",
     fontFamily: "Poppins_400Regular",
     textAlign: "center",
   },
