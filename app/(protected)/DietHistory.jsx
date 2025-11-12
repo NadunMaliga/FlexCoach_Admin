@@ -4,6 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import ApiService from "../services/api";
 import OfflineApiService from "../services/OfflineApiService";
 import Logger from '../utils/logger';
 import ListSkeleton from '../components/ListSkeleton';

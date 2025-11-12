@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import ApiService from '../services/api';
 import Logger from '../utils/logger';
 import LoadingGif from '../components/LoadingGif';
 import { showAlert, showSuccess, showError } from '../utils/customAlert';
