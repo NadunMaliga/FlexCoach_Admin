@@ -491,7 +491,7 @@ export default function ChatScreen() {
           </View>
         )}
         <TouchableOpacity
-          onLongPress={() => !item.sending && setDeleteMsgId(item.id)}
+          onLongPress={() => !item.sending && isMe && setDeleteMsgId(item.id)}
           delayLongPress={300}
           activeOpacity={0.9}
           style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', marginVertical: 6 }}
