@@ -44,6 +44,7 @@ router.get('/user/:userId', async (req, res) => {
     }
 
     console.log('🔍 Querying measurements with:', query);
+    console.log('🔍 Filtering by measurementType:', measurementType);
 
     // Get measurement records with sorting and limit
     const sortOptions = { createdAt: sortOrder === 'asc' ? 1 : -1 };
@@ -68,16 +69,20 @@ router.get('/user/:userId', async (req, res) => {
       Object.keys(measurementsData).forEach(type => {
         const value = measurementsData[type];
         if (value !== null && value !== undefined) {
+          // Normalize the type for comparison (lowercase, no spaces)
+          const normalizedType = type.toLowerCase().replace(/\s+/g, '');
+          const normalizedFilter = measurementType ? measurementType.toLowerCase().replace(/\s+/g, '') : null;
+          
           // Skip if filtering by specific measurement type and this doesn't match
-          if (measurementType && type !== measurementType) {
+          if (normalizedFilter && normalizedType !== normalizedFilter) {
             return;
           }
 
-          const measurementType = type.charAt(0).toUpperCase() + type.slice(1);
+          const formattedType = type.charAt(0).toUpperCase() + type.slice(1);
           const measurement = {
             _id: `${record._id}_${type}`,
             userId: record.userId,
-            measurementType,
+            measurementType: formattedType,  // Using formattedType instead of redeclaring
             value,
             unit: getUnitForMeasurementType(type),
             date: record.date || record.createdAt,
@@ -88,13 +93,15 @@ router.get('/user/:userId', async (req, res) => {
           measurements.push(measurement);
 
           // Group by type
-          if (!groupedMeasurements[measurementType]) {
-            groupedMeasurements[measurementType] = [];
+          if (!groupedMeasurements[formattedType]) {
+            groupedMeasurements[formattedType] = [];
           }
-          groupedMeasurements[measurementType].push(measurement);
+          groupedMeasurements[formattedType].push(measurement);
         }
       });
     });
+
+    console.log(`✅ Returning ${measurements.length} measurements (filtered from ${measurementRecords.length} records)`);
 
     res.json({
       success: true,
@@ -108,10 +115,11 @@ router.get('/user/:userId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get user body measurements error:', error);
+    console.error('❌ Get user body measurements error:', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Failed to load measurements',
+      details: error.message
     });
   }
 });

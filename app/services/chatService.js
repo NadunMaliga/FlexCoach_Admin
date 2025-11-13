@@ -4,6 +4,7 @@ import { CHAT_URL, CHAT_WS_URL, ENABLE_LOGGING } from '../config/environment';
 import { validateMessageContent, validateFileUri, validateUserId } from '../utils/validators';
 import { handleApiError, secureLog } from '../utils/errorHandling';
 import Logger from '../utils/logger';
+import SecureCache, { CacheType } from '../utils/secureCache';
 
 
 class ChatService {
@@ -20,9 +21,7 @@ class ChatService {
     this.wsUrl = CHAT_WS_URL;
     this.cacheKey = 'admin_chat_messages_cache';
     
-    if (ENABLE_LOGGING) {
-      console.log('Chat Service initialized with URL:', this.chatServerUrl);
-    }
+    Logger.info('Chat Service initialized');
   }
 
   // Helper function to construct full URLs for attachments
@@ -32,18 +31,17 @@ class ChatService {
     return `${this.chatServerUrl}${url}`;
   }
 
-  // Local message caching methods
+  // Local message caching methods (using secure cache)
   async getCachedMessages(userId) {
     try {
       const cacheKey = `${this.cacheKey}_${userId}`;
-      const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) {
-        const parsedCache = JSON.parse(cached);
-        console.log(`Admin loaded ${parsedCache.messages?.length || 0} cached messages for user ${userId}`);
-        return parsedCache.messages || [];
+      const cached = await SecureCache.get(cacheKey, CacheType.SENSITIVE);
+      if (cached && cached.messages) {
+        Logger.log(`Loaded ${cached.messages.length} cached messages`);
+        return cached.messages;
       }
     } catch (error) {
-      console.warn('Failed to load cached messages:', error);
+      Logger.warn('Failed to load cached messages');
     }
     return [];
   }
@@ -54,13 +52,13 @@ class ChatService {
       const cacheData = {
         userId,
         messages,
-        lastUpdated: new Date().toISOString(),
-        version: '1.0'
+        lastUpdated: new Date().toISOString()
       };
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      console.log(`Admin cached ${messages.length} messages for user ${userId}`);
+      // Cache messages securely with 24 hour TTL
+      await SecureCache.set(cacheKey, cacheData, CacheType.SENSITIVE, 24 * 60 * 60 * 1000);
+      Logger.log(`Cached ${messages.length} messages securely`);
     } catch (error) {
-      console.warn('Failed to cache messages:', error);
+      Logger.warn('Failed to cache messages');
     }
   }
 
@@ -68,56 +66,30 @@ class ChatService {
     try {
       if (userId) {
         const cacheKey = `${this.cacheKey}_${userId}`;
-        await AsyncStorage.removeItem(cacheKey);
-        console.log(`Admin cleared message cache for user ${userId}`);
+        await SecureCache.remove(cacheKey, CacheType.SENSITIVE);
+        Logger.log('Message cache cleared');
       } else {
         // Clear all message caches
-        const keys = await AsyncStorage.getAllKeys();
-        const messageCacheKeys = keys.filter(key => key.startsWith(this.cacheKey));
-        await AsyncStorage.multiRemove(messageCacheKeys);
-        console.log(`Admin cleared all message caches (${messageCacheKeys.length} caches)`);
+        const count = await SecureCache.clearPattern(this.cacheKey);
+        Logger.log(`Cleared ${count} message caches`);
       }
     } catch (error) {
-      console.warn('Failed to clear message cache:', error);
+      Logger.warn('Failed to clear message cache');
     }
   }
 
   async getCacheInfo() {
     try {
-      const keys = await AsyncStorage.getAllKeys();
-      const messageCacheKeys = keys.filter(key => key.startsWith(this.cacheKey));
-      const caches = [];
-      let totalSize = 0;
-
-      for (const key of messageCacheKeys) {
-        const data = await AsyncStorage.getItem(key);
-        if (data) {
-          const parsed = JSON.parse(data);
-          const sizeInBytes = new Blob([data]).size;
-          totalSize += sizeInBytes;
-          caches.push({
-            userId: parsed.userId,
-            messageCount: parsed.messages?.length || 0,
-            lastUpdated: parsed.lastUpdated,
-            sizeInKB: Math.round(sizeInBytes / 1024 * 100) / 100
-          });
-        }
-      }
-
-      return {
-        totalCaches: messageCacheKeys.length,
-        totalSize: `${Math.round(totalSize / 1024 * 100) / 100} KB`,
-        caches
-      };
+      return await SecureCache.getInfo();
     } catch (error) {
-      console.warn('Failed to get cache info:', error);
+      Logger.warn('Failed to get cache info');
       return { totalCaches: 0, totalSize: '0 KB', caches: [] };
     }
   }
 
   async connect() {
     try {
-      console.log('Connecting to chat server via REST API:', this.chatServerUrl);
+      Logger.info('Connecting to chat server');
       
       // Get auth token from SecureStore (same as ApiService)
       const token = await SecureStore.getItemAsync('adminToken');
@@ -128,7 +100,7 @@ class ChatService {
       Logger.log('Token operation completed');
 
       // Test connection with a simple API call
-      console.log(`Attempting to connect to: ${this.chatServerUrl}/health`);
+      Logger.log('Testing chat server connection');
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -150,7 +122,7 @@ class ChatService {
         }
         
         const healthData = await response.json();
-        console.log('Chat server health check passed:', healthData.message);
+        Logger.success('Chat server connected');
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
@@ -167,7 +139,7 @@ class ChatService {
 
       return { success: true, message: 'Connected to chat service' };
     } catch (error) {
-      console.error('Chat service connection failed:', error);
+      Logger.error('Chat service connection failed', error);
       this.isConnected = false;
       throw error;
     }
@@ -179,7 +151,7 @@ class ChatService {
       clearInterval(this.pollingInterval);
     }
 
-    console.log('Starting message polling...');
+    Logger.log('Message polling started');
     this.pollingInterval = setInterval(() => {
       if (this.currentChatUserId && this.isConnected) {
         this.checkForNewMessages(this.currentChatUserId);
@@ -204,7 +176,7 @@ class ChatService {
         );
 
         if (newMessages.length > 0) {
-          console.log(`Found ${newMessages.length} new messages`);
+          Logger.log(`Received ${newMessages.length} new messages`);
           
           newMessages.forEach(msg => {
             const transformedMessage = {
@@ -225,7 +197,7 @@ class ChatService {
         }
       }
     } catch (error) {
-      console.error('Error checking for new messages:', error);
+      Logger.error('Error checking for new messages');
       // Don't disconnect on polling errors, just log them
     }
   }
@@ -265,12 +237,12 @@ class ChatService {
         throw new Error(data.error || 'Failed to send message');
       }
 
-      console.log('Message sent successfully:', data.data._id);
+      Logger.success('Message sent');
       this.emit('messageSent', { success: true, messageId: data.data._id });
       
       return data;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      Logger.error('Failed to send message');
       this.emit('messageError', { error: error.message });
       throw error;
     }
@@ -308,7 +280,7 @@ class ChatService {
         name: name
       });
 
-      console.log('Admin: Uploading compressed image to server:', imageUri);
+      Logger.log('Uploading image');
 
       const response = await fetch(`${this.chatServerUrl}/api/messages`, {
         method: 'POST',
@@ -325,12 +297,12 @@ class ChatService {
         throw new Error(data.error || 'Failed to send image');
       }
 
-      console.log('Admin image sent successfully:', data.data._id);
+      Logger.success('Image sent');
       this.emit('messageSent', { success: true, messageId: data.data._id });
       
       return data;
     } catch (error) {
-      console.error('Admin failed to send image:', error);
+      Logger.error('Failed to send image');
       this.emit('messageError', { error: error.message });
       throw error;
     }
@@ -360,7 +332,7 @@ class ChatService {
         name: 'audio.m4a'
       });
 
-      console.log('Admin uploading audio:', audioUri);
+      Logger.log('Uploading audio');
 
       const response = await fetch(`${this.chatServerUrl}/api/messages`, {
         method: 'POST',
@@ -376,12 +348,12 @@ class ChatService {
         throw new Error(data.error || 'Failed to send audio');
       }
 
-      console.log('Admin audio sent successfully:', data.data._id);
+      Logger.success('Audio sent');
       this.emit('messageSent', { success: true, messageId: data.data._id });
       
       return data;
     } catch (error) {
-      console.error('Admin failed to send audio:', error);
+      Logger.error('Failed to send audio');
       this.emit('messageError', { error: error.message });
       throw error;
     }
@@ -390,17 +362,17 @@ class ChatService {
   // Mark messages as read (simplified for REST API)
   async markMessagesAsRead(chatId, messageIds) {
     // This would require additional API endpoint on the server
-    console.log('Mark as read not implemented for REST API mode');
+    Logger.log('Mark as read not implemented for REST API mode');
   }
 
   // Typing indicators (simplified - just local state)
   startTyping(receiver) {
-    console.log('Typing started for:', receiver);
+    Logger.log('Typing started');
     // In REST mode, typing indicators are not real-time
   }
 
   stopTyping(receiver) {
-    console.log('Typing stopped for:', receiver);
+    Logger.log('Typing stopped');
     // In REST mode, typing indicators are not real-time
   }
 
@@ -413,7 +385,7 @@ class ChatService {
     if (useCache && page === 1) {
       const cachedMessages = await this.getCachedMessages(userId);
       if (cachedMessages.length > 0) {
-        console.log('Admin using cached messages, fetching latest from server...');
+        Logger.log('Using cached messages');
         // Return cached data immediately, then fetch fresh data in background
         setTimeout(() => this.getChatHistory(userId, page, limit, false), 100);
         return {
@@ -457,7 +429,7 @@ class ChatService {
 
       return data;
     } catch (error) {
-      console.error('Failed to fetch chat history:', error);
+      Logger.error('Failed to fetch chat history');
       throw error;
     }
   }
@@ -489,7 +461,7 @@ class ChatService {
 
       return data;
     } catch (error) {
-      console.error('Failed to delete message:', error);
+      Logger.error('Failed to delete message');
       throw error;
     }
   }
@@ -518,7 +490,7 @@ class ChatService {
         try {
           callback(data);
         } catch (error) {
-          console.error(`Error in ${event} listener:`, error);
+          Logger.error('Error in event listener');
         }
       });
     }
@@ -539,7 +511,7 @@ class ChatService {
       }
       throw new Error(response.error || 'Failed to refresh chat history');
     } catch (error) {
-      console.error('Error refreshing chat history:', error);
+      Logger.error('Error refreshing chat history');
       throw error;
     }
   }
@@ -571,14 +543,6 @@ class ChatService {
     
     const imageUrl = this.constructFullUrl(imageAttachment?.url);
     const audioUrl = this.constructFullUrl(audioAttachment?.url);
-    
-    // Debug logging for image messages
-    if (imageAttachment) {
-      console.log('Image message found:');
-      console.log('  - Original URL:', imageAttachment.url);
-      console.log('  - Constructed URL:', imageUrl);
-      console.log('  - Chat server URL:', this.chatServerUrl);
-    }
     
     return {
       id: msg._id,

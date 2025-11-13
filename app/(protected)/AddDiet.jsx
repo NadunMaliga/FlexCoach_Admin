@@ -389,7 +389,7 @@ export default function AddDiet() {
       </TouchableOpacity>
 
       <Text style={styles.text}>
-        Create a customized diet plan for your client. Select a meal plan to get started.
+        Select one of the 3 meal slots. If a meal already exists, it will be replaced with your new plan.
       </Text>
       {/* Error Message */}
       {step1Error ? (
@@ -403,19 +403,23 @@ export default function AddDiet() {
         onRequestClose={() => setMealSelectModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity
-                onPress={() => setMealSelectModalVisible(false)}
-              >
-                <Feather name="x" size={22} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={true}>
+          <View style={styles.modalBox}>
+            <TouchableOpacity
+              style={styles.modalCloseIcon}
+              onPress={() => setMealSelectModalVisible(false)}
+            >
+              <Text style={{ color: "white", fontSize: 20 }}>✕</Text>
+            </TouchableOpacity>
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.modalTitle}>Select Meal</Text>
+              <Text style={styles.modalSub}>Choose one of the 3 meals for this client</Text>
               {mealPlanOptions.map((meal, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  style={styles.optionItem}
+                  style={styles.modalRow}
                   onPress={() => {
                     setSelectedMealPlan(meal);
                     setMealSelectModalVisible(false);
@@ -423,7 +427,7 @@ export default function AddDiet() {
                     HapticFeedback.light();
                   }}
                 >
-                  <Text style={styles.optionText}>{meal}</Text>
+                  <Text style={styles.modalRowKey}>{meal}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -807,7 +811,7 @@ const styles = StyleSheet.create({
   },
   nextBtnText: {
     fontSize: 18,
-    color: "#0000",
+    color: "#000",
     fontFamily: "Poppins_300Light",
     textAlign: "center",
   },
@@ -820,7 +824,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "flex-end",
   },
   modalContent: {
@@ -841,6 +845,50 @@ const styles = StyleSheet.create({
     borderBottomColor: "#1e1d1dff",
   },
   optionText: { color: "#949191ff", fontSize: 16, fontFamily: "Poppins_300Light" },
+  // Modal styles matching DietPlan
+  modalBox: {
+    backgroundColor: "#1c1c1c",
+    paddingHorizontal: 25,
+    paddingTop: 20,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    maxHeight: "45%",
+  },
+  modalCloseIcon: {
+    alignSelf: "flex-end",
+    padding: 10,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 26,
+    fontWeight: "400",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSub: {
+    color: "#aaa",
+    fontSize: 15,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalRow: {
+    marginBottom: 15,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#333",
+    paddingBottom: 10,
+  },
+  modalRowKey: {
+    color: "#f5f5f5",
+    fontSize: 16,
+    marginBottom: 5,
+    fontFamily: "Poppins_500Medium",
+  },
+  modalRowValue: {
+    color: "#bbb",
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    lineHeight: 20,
+  },
   disabledBtn: { opacity: 0.6 },
   errorMessage: {
     color: "#ff6b6b",

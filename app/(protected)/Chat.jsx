@@ -213,6 +213,34 @@ export default function ChatScreen() {
     }
   }, [userInfo, connectionStatus, navigation]);
 
+  // Add keyboard listeners to auto-scroll to bottom
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        // Scroll to bottom when keyboard appears
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        // Optional: scroll to bottom when keyboard hides
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
   // Setup chat event listeners
   useEffect(() => {
     const handleMessageReceived = (data) => {
@@ -679,8 +707,9 @@ export default function ChatScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={-20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <ImageBackground
           source={require('../../assets/images/chatbg.jpg')}
@@ -735,6 +764,12 @@ export default function ChatScreen() {
                 multiline={true}
                 numberOfLines={1}
                 textAlignVertical="center"
+                onFocus={() => {
+                  // Scroll to bottom when input is focused
+                  setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                  }, 300);
+                }}
                 onChangeText={(text) => {
                   setInput(text);
 

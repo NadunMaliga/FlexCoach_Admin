@@ -27,27 +27,36 @@ export default function MeasurementHistory() {
     const screenWidth = Dimensions.get("window").width - 40;
 
     useEffect(() => {
-        if (userId) {
+        if (userId && measurementName) {
             fetchMeasurements();
         }
-    }, [userId]);
+    }, [userId, measurementName]);
 
     const fetchMeasurements = async () => {
         try {
             setLoading(true);
             setError(null);
             
-            const response = await OfflineApiService.getUserBodyMeasurements(userId);
+            Logger.log('📊 Fetching measurements for user:', userId, 'type:', measurementName);
+            
+            // Pass measurement type as query parameter
+            const response = await OfflineApiService.getUserBodyMeasurements(userId, {
+                measurementType: measurementName
+            });
+            
+            Logger.log('📊 Measurements response:', response);
             
             if (response.success) {
                 setMeasurements(response.measurements || []);
                 setUserProfile(response.userProfile);
+                Logger.success(`✅ Loaded ${response.measurements?.length || 0} measurements`);
             } else {
-                setError('Failed to load measurements');
+                setError(response.error || 'Failed to load measurements');
+                Logger.error('❌ Failed to load measurements:', response.error);
             }
         } catch (err) {
-            Logger.error('Load measurements error:', err);
-            setError('Failed to load measurements');
+            Logger.error('❌ Load measurements error:', err);
+            setError(err.message || 'Failed to load measurements');
         } finally {
             setLoading(false);
         }

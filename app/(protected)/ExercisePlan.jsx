@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
     },
     footerBtnText: {
         fontSize: 18,
-        color: "#0000",
+        color: "#000",
         fontFamily: "Poppins_400Regular",
         textAlign: "center",
     },

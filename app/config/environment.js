@@ -8,7 +8,7 @@ import Logger from '../utils/logger';
  */
 
 // Detect if we're in development mode
-const isDev = typeof _DEV_ !== 'undefined' ? _DEV_ : false;
+const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
 // TEMPORARY: Force production URLs even in development for VPS testing
 const forceProduction = true;

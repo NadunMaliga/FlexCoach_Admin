@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
   },
   nextBtnText: {
     fontSize: 18,
-    color: "#0000",
+    color: "#000",
     fontFamily: "Poppins_300Light",
     textAlign: "center",
   },

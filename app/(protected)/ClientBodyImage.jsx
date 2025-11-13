@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Logger from '../utils/logger';
 import OfflineApiService from "../services/OfflineApiService";
 import LoadingGif from '../components/LoadingGif';
+import SecureCache, { CacheType } from '../utils/secureCache';
 
 
 const screenWidth = Dimensions.get("window").width;
@@ -49,27 +50,22 @@ export default function ClientBodyImage() {
     }
   }, [userId]);
 
-  // Load cached photos first for instant display
+  // Load cached photos first for instant display (using secure cache)
   const loadCachedPhotos = async () => {
     try {
-      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      const cached = await SecureCache.get(CACHE_KEY, CacheType.NORMAL);
       if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        const age = Date.now() - timestamp;
+        Logger.log('📦 Using cached photos');
+        setPhotos(cached);
+        setLoading(false);
         
-        if (age < CACHE_DURATION) {
-          Logger.log('📦 Using cached photos (age:', Math.round(age / 1000), 'seconds)');
-          setPhotos(data);
-          setLoading(false);
-          
-          // Prefetch images in background
-          data.forEach(photo => {
-            if (photo.front) Image.prefetch(photo.front);
-            if (photo.side) Image.prefetch(photo.side);
-            if (photo.back) Image.prefetch(photo.back);
-          });
-          return;
-        }
+        // Prefetch images in background
+        cached.forEach(photo => {
+          if (photo.front) Image.prefetch(photo.front);
+          if (photo.side) Image.prefetch(photo.side);
+          if (photo.back) Image.prefetch(photo.back);
+        });
+        return;
       }
     } catch (err) {
       Logger.log('Cache read error:', err);
@@ -119,12 +115,9 @@ export default function ClientBodyImage() {
         
         setPhotos(transformedPhotos);
         
-        // Cache the data
+        // Cache the data with TTL
         try {
-          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-            data: transformedPhotos,
-            timestamp: Date.now()
-          }));
+          await SecureCache.set(CACHE_KEY, transformedPhotos, CacheType.NORMAL, CACHE_DURATION);
           Logger.log('💾 Photos cached successfully');
         } catch (cacheErr) {
           Logger.log('Cache write error:', cacheErr);

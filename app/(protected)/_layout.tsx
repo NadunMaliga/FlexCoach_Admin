@@ -146,12 +146,6 @@ export default function ProtectedLayout() {
         }}
       />
       <Stack.Screen
-        name="ProfileSchedules"
-        options={{
-          title: 'Schedule Details'
-        }}
-      />
-      <Stack.Screen
         name="AddDiet"
         options={{
           title: 'Add Diet',
