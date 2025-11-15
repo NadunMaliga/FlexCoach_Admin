@@ -9,7 +9,23 @@ const mealSchema = new mongoose.Schema({
   time: {
     type: String,
     required: true,
-    enum: ['Morning', 'Breakfast', 'Snacks', 'Lunch', 'Post-Workout', 'Dinner', 'Evening']
+    validate: {
+      validator: function(v) {
+        // Allow base meal types and numbered variations (e.g., "Snacks 1", "Pre-Workout 2")
+        const validPatterns = [
+          /^Morning$/,
+          /^Breakfast$/,
+          /^Snacks( \d+)?$/,
+          /^Lunch$/,
+          /^Pre-Workout( \d+)?$/,
+          /^Post-Workout$/,
+          /^Dinner$/,
+          /^Evening$/
+        ];
+        return validPatterns.some(pattern => pattern.test(v));
+      },
+      message: props => `${props.value} is not a valid meal time`
+    }
   },
   foods: [{
     food: {

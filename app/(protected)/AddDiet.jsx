@@ -56,7 +56,10 @@ export default function AddDiet() {
   const [mealSelectModalVisible, setMealSelectModalVisible] = useState(false);
 
   // Step 2 - Food Selection
-  const mealTypes = ["Morning", "Breakfast", "Snacks", "Lunch", "Post-Workout", "Dinner"];
+  const baseMealTypes = ["Morning", "Breakfast", "Lunch", "Post-Workout", "Dinner"];
+  const [mealTypes, setMealTypes] = useState(["Morning", "Breakfast", "Snacks 1", "Lunch", "Pre-Workout 1", "Post-Workout", "Dinner"]);
+  const [snackCount, setSnackCount] = useState(1);
+  const [preWorkoutCount, setPreWorkoutCount] = useState(1);
   const [foodOptions, setFoodOptions] = useState([
     "Chicken Breast", "Eggs", "Oats", "Banana", "Fish",
     "Rice", "Vegetables", "Protein Scoop", "Almonds", "Sweet Potato"
@@ -152,6 +155,10 @@ export default function AddDiet() {
 
           // Transform meals back to addedFoods format (array of food objects)
           const transformedFoods = {};
+          let maxSnackNumber = 0;
+          let maxPreWorkoutNumber = 0;
+          const updatedMealTypes = [...baseMealTypes];
+          
           dietToEdit.meals.forEach(meal => {
             const foodList = meal.foods.map(food => {
               // Reconstruct the quantity string from quantity + unit
@@ -169,8 +176,54 @@ export default function AddDiet() {
             });
 
             transformedFoods[meal.time] = foodList;
+            
+            // Track snack numbers
+            const snackMatch = meal.time.match(/^Snacks (\d+)$/);
+            if (snackMatch) {
+              const snackNum = parseInt(snackMatch[1]);
+              if (snackNum > maxSnackNumber) {
+                maxSnackNumber = snackNum;
+              }
+            }
+            
+            // Track pre-workout numbers
+            const preWorkoutMatch = meal.time.match(/^Pre-Workout (\d+)$/);
+            if (preWorkoutMatch) {
+              const preWorkoutNum = parseInt(preWorkoutMatch[1]);
+              if (preWorkoutNum > maxPreWorkoutNumber) {
+                maxPreWorkoutNumber = preWorkoutNum;
+              }
+            }
           });
 
+          // Rebuild meal types with correct snack and pre-workout counts
+          let insertIndex = 2; // Start after "Breakfast"
+          
+          // Add snacks
+          for (let i = 1; i <= maxSnackNumber; i++) {
+            if (!updatedMealTypes.includes(`Snacks ${i}`)) {
+              updatedMealTypes.splice(insertIndex, 0, `Snacks ${i}`);
+            }
+            insertIndex++;
+          }
+          
+          // Skip "Lunch" if it exists
+          const lunchIndex = updatedMealTypes.indexOf("Lunch");
+          if (lunchIndex !== -1) {
+            insertIndex = lunchIndex + 1;
+          }
+          
+          // Add pre-workouts
+          for (let i = 1; i <= maxPreWorkoutNumber; i++) {
+            if (!updatedMealTypes.includes(`Pre-Workout ${i}`)) {
+              updatedMealTypes.splice(insertIndex, 0, `Pre-Workout ${i}`);
+            }
+            insertIndex++;
+          }
+          
+          setMealTypes(updatedMealTypes);
+          setSnackCount(maxSnackNumber);
+          setPreWorkoutCount(maxPreWorkoutNumber);
           setAddedFoods(transformedFoods);
           Logger.log('Loaded foods for editing:', transformedFoods);
         } else {
@@ -437,6 +490,90 @@ export default function AddDiet() {
     </View>
   );
 
+  const addNewSnack = () => {
+    const newSnackNumber = snackCount + 1;
+    const newSnackName = `Snacks ${newSnackNumber}`;
+    
+    // Insert new snack after the last snack
+    const snackIndex = mealTypes.findIndex(m => m.startsWith('Snacks'));
+    const lastSnackIndex = mealTypes.reduce((lastIdx, meal, idx) => {
+      return meal.startsWith('Snacks') ? idx : lastIdx;
+    }, snackIndex);
+    
+    const updatedMealTypes = [...mealTypes];
+    updatedMealTypes.splice(lastSnackIndex + 1, 0, newSnackName);
+    
+    setMealTypes(updatedMealTypes);
+    setSnackCount(newSnackNumber);
+    setSelectedMealType(newSnackName);
+    HapticFeedback.success();
+  };
+
+  const removeSnack = (snackName) => {
+    // Don't allow removing if it has foods
+    if (addedFoods[snackName] && addedFoods[snackName].length > 0) {
+      showAlert('Cannot Remove', 'Please remove all foods from this snack first');
+      return;
+    }
+    
+    // Remove from meal types
+    const updatedMealTypes = mealTypes.filter(m => m !== snackName);
+    setMealTypes(updatedMealTypes);
+    
+    // Update snack count
+    const remainingSnacks = updatedMealTypes.filter(m => m.startsWith('Snacks'));
+    setSnackCount(remainingSnacks.length);
+    
+    // Select a different meal type if the removed one was selected
+    if (selectedMealType === snackName) {
+      setSelectedMealType(updatedMealTypes[0] || "Breakfast");
+    }
+    
+    HapticFeedback.success();
+  };
+
+  const addNewPreWorkout = () => {
+    const newPreWorkoutNumber = preWorkoutCount + 1;
+    const newPreWorkoutName = `Pre-Workout ${newPreWorkoutNumber}`;
+    
+    // Insert new pre-workout after the last pre-workout
+    const preWorkoutIndex = mealTypes.findIndex(m => m.startsWith('Pre-Workout'));
+    const lastPreWorkoutIndex = mealTypes.reduce((lastIdx, meal, idx) => {
+      return meal.startsWith('Pre-Workout') ? idx : lastIdx;
+    }, preWorkoutIndex);
+    
+    const updatedMealTypes = [...mealTypes];
+    updatedMealTypes.splice(lastPreWorkoutIndex + 1, 0, newPreWorkoutName);
+    
+    setMealTypes(updatedMealTypes);
+    setPreWorkoutCount(newPreWorkoutNumber);
+    setSelectedMealType(newPreWorkoutName);
+    HapticFeedback.success();
+  };
+
+  const removePreWorkout = (preWorkoutName) => {
+    // Don't allow removing if it has foods
+    if (addedFoods[preWorkoutName] && addedFoods[preWorkoutName].length > 0) {
+      showAlert('Cannot Remove', 'Please remove all foods from this pre-workout first');
+      return;
+    }
+    
+    // Remove from meal types
+    const updatedMealTypes = mealTypes.filter(m => m !== preWorkoutName);
+    setMealTypes(updatedMealTypes);
+    
+    // Update pre-workout count
+    const remainingPreWorkouts = updatedMealTypes.filter(m => m.startsWith('Pre-Workout'));
+    setPreWorkoutCount(remainingPreWorkouts.length);
+    
+    // Select a different meal type if the removed one was selected
+    if (selectedMealType === preWorkoutName) {
+      setSelectedMealType(updatedMealTypes[0] || "Breakfast");
+    }
+    
+    HapticFeedback.success();
+  };
+
   const renderStep2 = () => (
     <View>
       <Text style={styles.stepTitle}>Step 2: Add Foods</Text>
@@ -447,19 +584,54 @@ export default function AddDiet() {
         style={{ marginBottom: 15 }}
       >
         {mealTypes.map((meal) => (
-          <TouchableOpacity
-            key={meal}
-            style={[
-              styles.mealTypeBtn,
-              selectedMealType === meal && { backgroundColor: "#d5ff5f" },
-            ]}
-            onPress={() => setSelectedMealType(meal)}
-          >
-            <Text style={{ color: selectedMealType === meal ? "black" : "#fff", fontFamily: "Poppins_400Regular" }}>
-              {meal}
-            </Text>
-          </TouchableOpacity>
+          <View key={meal} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 10 }}>
+            <TouchableOpacity
+              style={[
+                styles.mealTypeBtn,
+                selectedMealType === meal && { backgroundColor: "#d5ff5f" },
+              ]}
+              onPress={() => setSelectedMealType(meal)}
+            >
+              <Text style={{ color: selectedMealType === meal ? "black" : "#fff", fontFamily: "Poppins_400Regular" }}>
+                {meal}
+              </Text>
+            </TouchableOpacity>
+            {meal.startsWith('Snacks') && snackCount > 1 && (
+              <TouchableOpacity
+                onPress={() => removeSnack(meal)}
+                style={styles.removeSnackBtn}
+              >
+                <Feather name="x" size={14} color="#ff6b6b" />
+              </TouchableOpacity>
+            )}
+            {meal.startsWith('Pre-Workout') && preWorkoutCount > 1 && (
+              <TouchableOpacity
+                onPress={() => removePreWorkout(meal)}
+                style={styles.removeSnackBtn}
+              >
+                <Feather name="x" size={14} color="#ff6b6b" />
+              </TouchableOpacity>
+            )}
+          </View>
         ))}
+        <TouchableOpacity
+          style={styles.addSnackBtn}
+          onPress={addNewSnack}
+        >
+          <Feather name="plus" size={16} color="#d5ff5f" />
+          <Text style={{ color: "#d5ff5f", marginLeft: 5, fontFamily: "Poppins_400Regular" }}>
+            Add Snack
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.addPreWorkoutBtn}
+          onPress={addNewPreWorkout}
+        >
+          <Feather name="plus" size={16} color="#ff9f43" />
+          <Text style={{ color: "#ff9f43", marginLeft: 5, fontFamily: "Poppins_400Regular" }}>
+            Add Pre-Workout
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <TouchableOpacity
@@ -897,5 +1069,34 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 5,
     textAlign: "center",
+  },
+  addSnackBtn: {
+    backgroundColor: "#2a2a2a",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#d5ff5f",
+    marginRight: 10,
+  },
+  addPreWorkoutBtn: {
+    backgroundColor: "#2a2a2a",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ff9f43",
+  },
+  removeSnackBtn: {
+    marginLeft: -8,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: "#ff6b6b",
   },
 });

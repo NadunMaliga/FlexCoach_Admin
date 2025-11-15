@@ -145,7 +145,23 @@ router.post('/', [
   body('dietType').isIn(['Weight Loss', 'Weight Gain', 'Muscle Building', 'Maintenance', 'Athletic Performance']).withMessage('Valid diet type is required'),
   body('meals').isArray().withMessage('Meals must be an array'),
   body('meals.*.name').notEmpty().withMessage('Meal name is required'),
-  body('meals.*.time').isIn(['Morning', 'Breakfast', 'Snacks', 'Lunch', 'Post-Workout', 'Dinner', 'Evening']).withMessage('Valid meal time is required')
+  body('meals.*.time').custom((value) => {
+    // Allow base meal types and numbered variations (e.g., "Snacks 1", "Pre-Workout 2")
+    const validPatterns = [
+      /^Morning$/,
+      /^Breakfast$/,
+      /^Snacks( \d+)?$/,
+      /^Lunch$/,
+      /^Pre-Workout( \d+)?$/,
+      /^Post-Workout$/,
+      /^Dinner$/,
+      /^Evening$/
+    ];
+    if (!validPatterns.some(pattern => pattern.test(value))) {
+      throw new Error('Valid meal time is required');
+    }
+    return true;
+  })
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
