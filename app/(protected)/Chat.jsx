@@ -21,7 +21,9 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import EmojiPicker from "rn-emoji-keyboard";
 import OfflineApiService from "../services/OfflineApiService";
 import Logger from '../utils/logger';
@@ -35,6 +37,7 @@ export default function ChatScreen() {
   const { userId, userName } = useLocalSearchParams();
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [userInfo, setUserInfo] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -58,6 +61,9 @@ export default function ChatScreen() {
   const [deleteMsgId, setDeleteMsgId] = useState(null);
   const [failedImages, setFailedImages] = useState(new Set());
   const [lastImageUri, setLastImageUri] = useState(null);
+
+  // Keyboard state for gap
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Animate image modal open/close
   useEffect(() => {
@@ -213,11 +219,13 @@ export default function ChatScreen() {
     }
   }, [userInfo, connectionStatus, navigation]);
 
-  // Add keyboard listeners to auto-scroll to bottom
+  // Add keyboard listeners to auto-scroll to bottom and track keyboard height
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
+      (e) => {
+        // Set keyboard height for gap
+        setKeyboardHeight(15); // 15px gap
         // Scroll to bottom when keyboard appears
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -228,6 +236,8 @@ export default function ChatScreen() {
     const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
+        // Reset keyboard height
+        setKeyboardHeight(0);
         // Optional: scroll to bottom when keyboard hides
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -707,9 +717,8 @@ export default function ChatScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
-        enabled={Platform.OS === 'ios'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 40}
       >
         <ImageBackground
           source={require('../../assets/images/chatbg.jpg')}
@@ -753,7 +762,7 @@ export default function ChatScreen() {
           )}
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12), marginBottom: keyboardHeight }]}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -875,13 +884,13 @@ export default function ChatScreen() {
                 <Text style={styles.deleteTitle}>Delete this message?</Text>
                 <View style={styles.deleteActions}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, {color:"red"}]}
+                    style={[styles.actionBtn, { color: "red" }]}
                     onPress={() => setDeleteMsgId(null)}
                   >
                     <Text style={{ color: "white", fontSize: 16 }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { color:"red"}]}
+                    style={[styles.actionBtn, { color: "red" }]}
                     onPress={handleDelete}
                   >
                     <Text style={{ color: "white", fontSize: 16 }}>Delete</Text>
@@ -950,7 +959,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
   },
-  messagesList: { flex: 1, paddingHorizontal: 12 },
+  messagesList: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
   messageContainer: {
     paddingHorizontal: 18,
     paddingVertical: 8,
@@ -964,7 +977,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 18,
-    paddingVertical: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: "#000000",
     borderTopWidth: 1,
     borderTopColor: "#000000ff",
@@ -977,10 +991,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingRight: 80,
-    paddingVertical: 15,
+    paddingTop: Platform.OS === 'android' ? 12 : 15,
+    paddingBottom: Platform.OS === 'android' ? 12 : 15,
     fontSize: 15,
     minHeight: 50,
-    maxHeight: 100,
+    maxHeight: 120,
   },
   inputIconsContainer: {
     position: "absolute",
@@ -1033,8 +1048,8 @@ const styles = StyleSheet.create({
   },
   deleteBox: {
     backgroundColor: "#090909ff",
-    borderWidth:1,
-    borderColor:"#2e2e2eff",
+    borderWidth: 1,
+    borderColor: "#2e2e2eff",
     padding: 25,
     borderRadius: 20,
     width: "75%",
